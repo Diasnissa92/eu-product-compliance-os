@@ -16,6 +16,8 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import type { WorkspaceContext } from "@/lib/auth/workspace";
 
 const navigation = [
   { href: "/dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
@@ -38,7 +40,7 @@ function Brand() {
   );
 }
 
-function SidebarContent({ close }: { close?: () => void }) {
+function SidebarContent({ close, workspace }: { close?: () => void; workspace: WorkspaceContext }) {
   const pathname = usePathname();
 
   return (
@@ -53,10 +55,10 @@ function SidebarContent({ close }: { close?: () => void }) {
       </div>
 
       <div className="workspace-switcher">
-        <span className="avatar avatar-square">ND</span>
+        <span className="avatar avatar-square">{workspace.organizationInitials}</span>
         <span>
           <small>Organisation</small>
-          <strong>Nordhavn Design</strong>
+          <strong>{workspace.organizationName}</strong>
         </span>
         <ChevronDown size={16} aria-hidden="true" />
       </div>
@@ -93,27 +95,35 @@ function SidebarContent({ close }: { close?: () => void }) {
 
       <div className="sidebar-footer">
         <button className="nav-item" type="button"><CircleHelp size={19} />Centre d’aide</button>
-        <div className="account-row">
-          <span className="avatar">HD</span>
-          <span><strong>Hugo Dias</strong><small>Administrateur</small></span>
-          <ChevronDown size={16} />
-        </div>
+        {workspace.mode === "authenticated" ? (
+          <div className="account-row">
+            <span className="avatar">{workspace.userInitials}</span>
+            <span><strong>{workspace.userName}</strong><small>{workspace.role}</small></span>
+            <SignOutButton />
+          </div>
+        ) : (
+          <Link className="account-row account-row-link" href="/login" onClick={close}>
+            <span className="avatar">{workspace.userInitials}</span>
+            <span><strong>Mode démonstration</strong><small>Se connecter</small></span>
+            <ChevronDown size={16} />
+          </Link>
+        )}
       </div>
     </>
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, workspace }: { children: React.ReactNode; workspace: WorkspaceContext }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar"><SidebarContent /></aside>
+      <aside className="sidebar"><SidebarContent workspace={workspace} /></aside>
 
       {mobileOpen ? (
         <div className="mobile-navigation" role="dialog" aria-modal="true" aria-label="Menu principal">
           <button className="mobile-backdrop" onClick={() => setMobileOpen(false)} aria-label="Fermer le menu" />
-          <aside className="mobile-sidebar"><SidebarContent close={() => setMobileOpen(false)} /></aside>
+          <aside className="mobile-sidebar"><SidebarContent close={() => setMobileOpen(false)} workspace={workspace} /></aside>
         </div>
       ) : null}
 
@@ -124,7 +134,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className="topbar-context">
             <span className="status-dot" />
-            Données de démonstration
+            {workspace.mode === "authenticated" ? "Données sécurisées" : "Données de démonstration"}
           </div>
           <div className="topbar-actions">
             <button className="icon-button notification-button" type="button" aria-label="Notifications">
@@ -132,7 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span aria-label="3 notifications">3</span>
             </button>
             <span className="topbar-divider" />
-            <span className="avatar avatar-small">HD</span>
+            <span className="avatar avatar-small">{workspace.userInitials}</span>
           </div>
         </header>
         <div className="workspace-content">{children}</div>

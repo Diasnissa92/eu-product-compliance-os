@@ -1,11 +1,15 @@
 import { Download, Plus } from "lucide-react";
 import Link from "next/link";
 import { ProductTable } from "@/components/product/product-table";
-import { products } from "@/lib/demo-data";
+import { getWorkspaceContext } from "@/lib/auth/workspace";
+import { getWorkspaceProducts } from "@/lib/data/products";
 
 export const metadata = { title: "Produits" };
 
-export default function ProductsPage() {
+export default async function ProductsPage() {
+  const workspace = await getWorkspaceContext();
+  const products = await getWorkspaceProducts(workspace);
+
   return (
     <main>
       <section className="page-heading">
@@ -21,7 +25,7 @@ export default function ProductsPage() {
       </section>
 
       <section className="panel products-panel">
-        <ProductTable products={products} />
+        {products.length ? <ProductTable products={products} /> : <div className="empty-state"><Plus size={28} /><strong>Votre registre est vide</strong><p>Ajoutez un produit pour lancer son diagnostic réglementaire.</p><Link className="button button-primary button-small" href="/products/new"><Plus size={16} />Ajouter un produit</Link></div>}
       </section>
     </main>
   );

@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Globe2, PackagePlus, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const steps = [
   { id: 1, label: "Produit" },
@@ -13,7 +14,9 @@ const steps = [
 
 const markets = ["France", "Allemagne", "Belgique", "Pays-Bas", "Espagne", "Italie", "Portugal"];
 
-export function NewProductForm() {
+type PersistenceContext = { organizationId: string };
+
+export function NewProductForm({ persistence }: { persistence?: PersistenceContext }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
@@ -22,6 +25,8 @@ export function NewProductForm() {
   const [manufacturer, setManufacturer] = useState("");
   const [originCountry, setOriginCountry] = useState("");
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>(["France"]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
 
   const canContinue =
     (step === 1 && name.trim() && sku.trim() && category) ||
@@ -35,13 +40,84 @@ export function NewProductForm() {
     );
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (step < 4) {
       setStep((current) => current + 1);
       return;
     }
-    router.push("/products/luma-mini?created=1");
+    if (!persistence) {
+      router.push("/products/luma-mini?created=1");
+      return;
+    }
+
+    setSaving(true);
+    setError(undefined);
+    const supabase = createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      setError("Votre session a expiré. Reconnectez-vous.");
+      setSaving(false);
+      return;
+    }
+
+    const sector = category === "Produit de construction" ? "construction" : "consumer";
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .insert({
+        org_id: persistence.organizationId,
+        created_by: user.id,
+        name: name.trim(),
+        sku: sku.trim(),
+        category,
+        sector,
+        origin_country: originCountry.trim(),
+        manufacturer_name: manufacturer.trim(),
+        target_markets: selectedMarkets,
+        status: "draft",
+        risk_level: "unknown",
+      })
+      .select("id")
+      .single();
+
+    if (productError || !product) {
+      setError(productError?.message || "Le produit n'a pas pu être créé.");
+      setSaving(false);
+      return;
+    }
+
+    const { data: requirements } = await supabase
+      .from("requirements")
+      .select("id")
+      .in("sector", ["cross-sector", sector]);
+
+    if (requirements?.length) {
+      const { error: checklistError } = await supabase.from("product_requirements").insert(
+        requirements.map((requirement) => ({
+          org_id: persistence.organizationId,
+          product_id: product.id,
+          requirement_id: requirement.id,
+          status: "pending",
+        })),
+      );
+      if (checklistError) {
+        setError(`Le produit est créé, mais la checklist doit être régénérée : ${checklistError.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    await supabase.from("audit_events").insert({
+      org_id: persistence.organizationId,
+      user_id: user.id,
+      entity_type: "product",
+      entity_id: product.id,
+      action: "Dossier produit créé",
+      payload: { category, markets: selectedMarkets, source: "onboarding_v1" },
+    });
+
+    router.push(`/products/${product.id}?created=1`);
+    router.refresh();
   }
 
   return (
@@ -119,14 +195,15 @@ export function NewProductForm() {
                 </div>
                 <div className="diagnostic-rules"><span><Check size={15} />Règlement général sur la sécurité des produits (GPSR)</span>{category === "Équipement électrique" ? <><span><Check size={15} />Basse tension (LVD)</span><span><Check size={15} />Compatibilité électromagnétique (EMC)</span><span><Check size={15} />RoHS</span></> : <span><Check size={15} />Règles sectorielles à confirmer</span>}</div>
               </div>
-              <div className="prototype-note"><ShieldCheck size={18} /><p><strong>Mode démonstration</strong> La création ouvrira un dossier exemple. La persistance sera connectée lors du prochain lot.</p></div>
+              <div className="prototype-note"><ShieldCheck size={18} /><p><strong>{persistence ? "Enregistrement sécurisé" : "Mode démonstration"}</strong> {persistence ? "Le produit et sa checklist seront enregistrés dans votre organisation." : "La création ouvrira un dossier exemple. Connectez-vous pour enregistrer vos données."}</p></div>
+              {error ? <p className="form-feedback form-feedback-error" role="alert">{error}</p> : null}
             </fieldset>
           ) : null}
         </div>
 
         <div className="creation-footer">
           {step > 1 ? <button className="button button-secondary" type="button" onClick={() => setStep((current) => current - 1)}><ArrowLeft size={17} />Précédent</button> : <span />}
-          <button className="button button-primary" type="submit" disabled={!canContinue}>{step === 4 ? "Créer le dossier" : "Continuer"}<ArrowRight size={17} /></button>
+          <button className="button button-primary" type="submit" disabled={!canContinue || saving}>{saving ? "Création…" : step === 4 ? "Créer le dossier" : "Continuer"}<ArrowRight size={17} /></button>
         </div>
       </section>
     </form>

@@ -21,6 +21,7 @@ export type ProductDocument = {
   uploadedAt: string;
   expiresAt?: string;
   size: string;
+  filePath?: string;
 };
 
 export type AuditEvent = {

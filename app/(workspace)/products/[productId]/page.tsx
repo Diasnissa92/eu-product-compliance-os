@@ -21,16 +21,14 @@ import { RequirementChecklist } from "@/components/product/requirement-checklist
 import { ProductVisual } from "@/components/product-visual";
 import { StatusPill } from "@/components/status-pill";
 import { countOpenActions } from "@/lib/compliance";
-import { getProduct, products } from "@/lib/demo-data";
+import { getWorkspaceContext } from "@/lib/auth/workspace";
+import { getWorkspaceProduct } from "@/lib/data/products";
 import { complianceStatusCopy } from "@/lib/status";
-
-export function generateStaticParams() {
-  return products.map((product) => ({ productId: product.id }));
-}
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = await params;
-  const product = getProduct(productId);
+  const workspace = await getWorkspaceContext();
+  const product = await getWorkspaceProduct(workspace, productId);
   if (!product) notFound();
 
   const openActions = countOpenActions(product.requirements);
@@ -86,7 +84,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
           <section className="panel detail-section" id="documents">
             <div className="panel-heading"><div><span className="eyebrow">Coffre de preuves</span><h2>Documents réglementaires</h2></div></div>
-            <DocumentVault documents={product.documents} />
+            <DocumentVault
+              documents={product.documents}
+              persistence={workspace.mode === "authenticated" && workspace.organizationId
+                ? { organizationId: workspace.organizationId, productId: product.id }
+                : undefined}
+            />
           </section>
 
           <section className="panel detail-section" id="audit">
