@@ -3,11 +3,12 @@
 import { Check, MoreHorizontal, Share2 } from "lucide-react";
 import { useState } from "react";
 
-export function ProductActions() {
+export function ProductActions({ productId }: { productId: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copyLink() {
-    await navigator.clipboard.writeText(window.location.href);
+    const reportUrl = new URL(`/products/${productId}/report`, window.location.origin).toString();
+    await navigator.clipboard.writeText(reportUrl);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
@@ -16,7 +17,7 @@ export function ProductActions() {
     <div className="heading-actions">
       <button className="button button-secondary" type="button" onClick={copyLink}>
         {copied ? <Check size={17} /> : <Share2 size={17} />}
-        {copied ? "Lien copié" : "Partager la fiche"}
+        {copied ? "Lien sécurisé copié" : "Partager la fiche"}
       </button>
       <button className="icon-button bordered-icon" type="button" aria-label="Plus d’actions"><MoreHorizontal size={19} /></button>
     </div>
