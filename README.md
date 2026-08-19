@@ -16,6 +16,7 @@ Ce dépôt contient le premier socle navigable de la V1 :
 - isolation multi-organisation par Row Level Security (RLS) ;
 - enregistrement réel des produits, checklists et événements d'audit ;
 - mode démonstration disponible sans compte.
+- fiche réglementaire synthétique, imprimable en PDF et partageable par lien protégé ;
 
 Les utilisateurs non connectés voient des données de démonstration. Une fois connecté, chaque utilisateur accède uniquement aux données de son organisation. Aucune décision juridique automatique n'est produite à ce stade.
 
@@ -49,9 +50,9 @@ npm run build
 
 ## Prochain lot
 
-1. Téléversement réel avec stockage objet.
-2. Extraction structurée des documents et validation humaine.
-3. Moteur de règles versionné par catégorie et marché.
-4. Alertes, partage sécurisé et facturation Stripe.
+1. Extraction structurée des documents avec validation humaine.
+2. Moteur de règles versionné par catégorie et marché.
+3. Invitations d’utilisateurs et partage externe à durée limitée.
+4. Facturation Stripe et gestion des plans.
 
 > EU Product Compliance OS est un outil d'aide à la conformité. Il ne remplace pas un conseil juridique ou un organisme notifié lorsque ceux-ci sont requis.

@@ -46,7 +46,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <div className="framework-list">{product.frameworks.map((framework) => <span key={framework}>{framework}</span>)}</div>
           </div>
         </div>
-        <ProductActions />
+        <ProductActions productId={product.id} />
       </section>
 
       <section className={`status-banner banner-${product.status}`}>
@@ -135,7 +135,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <span className="eyebrow">Fiche réglementaire</span>
             <h3>Un dossier prêt à partager</h3>
             <p>Générez une vue synthétique des preuves et exigences enregistrées.</p>
-            <button className="button button-dark button-full" type="button">Prévisualiser la fiche <ArrowRight size={16} /></button>
+            <Link className="button button-dark button-full" href={`/products/${product.id}/report`}>Prévisualiser la fiche <ArrowRight size={16} /></Link>
           </section>
         </aside>
       </div>
