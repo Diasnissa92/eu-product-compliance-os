@@ -128,7 +128,7 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     regulation: row.requirements.regulations.code,
     status: mapRequirementStatus(row.status),
     severity: mapRequirementSeverity(row.requirements.requirement_type, row.requirements.mandatory),
-    dueDate: row.last_checked_at ? formatDate(row.last_checked_at) : undefined,
+    dueDate: undefined,
     evidenceDocumentId: row.evidence_document_id ?? undefined,
     evidenceDocumentName: row.evidence_document_id ? documentNames.get(row.evidence_document_id) : undefined,
   }));

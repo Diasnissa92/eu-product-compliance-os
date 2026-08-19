@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 import { ComplianceRing } from "@/components/dashboard/compliance-ring";
 import { DocumentVault } from "@/components/product/document-vault";
 import { ProductActions } from "@/components/product/product-actions";
+import { ProductInformationEditor } from "@/components/product/product-information-editor";
 import { RequirementChecklist } from "@/components/product/requirement-checklist";
 import { ProductVisual } from "@/components/product-visual";
 import { StatusPill } from "@/components/status-pill";
@@ -32,6 +33,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   if (!product) notFound();
 
   const openActions = countOpenActions(product.requirements);
+  const persistence = workspace.mode === "authenticated" && workspace.organizationId
+    ? { organizationId: workspace.organizationId, productId: product.id }
+    : undefined;
 
   return (
     <main>
@@ -65,7 +69,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       <div className="product-detail-grid" id="overview">
         <div className="product-main-column">
           <section className="panel product-info-panel">
-            <div className="panel-heading"><div><span className="eyebrow">Qualification</span><h2>Informations produit</h2></div><button className="text-link" type="button">Modifier</button></div>
+            <div className="panel-heading"><div><span className="eyebrow">Qualification</span><h2>Informations produit</h2></div>{persistence ? <ProductInformationEditor product={product} persistence={persistence} /> : null}</div>
             <dl className="product-data-grid">
               <div><dt><Building2 size={16} />Fabricant</dt><dd>{product.manufacturer}</dd></div>
               <div><dt><MapPin size={16} />Pays d’origine</dt><dd>{product.originCountry}</dd></div>
@@ -83,9 +87,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               key={product.requirements.map((requirement) => `${requirement.id}:${requirement.status}:${requirement.evidenceDocumentId ?? ""}`).join("|")}
               requirements={product.requirements}
               documents={product.documents}
-              persistence={workspace.mode === "authenticated" && workspace.organizationId
-                ? { organizationId: workspace.organizationId, productId: product.id }
-                : undefined}
+              persistence={persistence}
             />
           </section>
 
@@ -94,9 +96,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <DocumentVault
               key={product.documents.map((document) => `${document.id}:${document.status}`).join("|")}
               documents={product.documents}
-              persistence={workspace.mode === "authenticated" && workspace.organizationId
-                ? { organizationId: workspace.organizationId, productId: product.id }
-                : undefined}
+              persistence={persistence}
             />
           </section>
 
