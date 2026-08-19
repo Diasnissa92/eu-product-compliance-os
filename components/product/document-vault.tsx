@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Download, File, FileSearch, MoreHorizontal, Plus, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, File, FileSearch, Plus, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -223,7 +223,7 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
               <button className="icon-button" type="button" disabled={downloadingId === document.id} onClick={() => void downloadDocument(document)} aria-label={`Télécharger ${document.name}`}>
                 <Download size={18} />
               </button>
-            ) : <button className="icon-button" type="button" aria-label={`Actions pour ${document.name}`}><MoreHorizontal size={18} /></button>}
+            ) : <span className="document-no-file" title="Fichier de démonstration non téléchargeable">—</span>}
           </article>
         ))}
       </div>

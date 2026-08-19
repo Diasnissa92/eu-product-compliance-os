@@ -446,6 +446,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .document-register-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 22px 14px; }
 .sort-field { display: flex; height: 40px; flex: 0 0 auto; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface); }
 .sort-field select { min-width: 126px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 11px; font-weight: 650; }
+.product-sort-field select { min-width: 138px; }
+.document-no-file { display: grid; width: 34px; height: 34px; place-items: center; color: var(--muted); font-size: 12px; }
 .document-register-error { margin: 0 22px 13px; }
 .document-register-table { width: 100%; min-width: 920px; border-collapse: collapse; white-space: nowrap; }
 .document-register-table th { height: 40px; padding: 0 12px; border-top: 1px solid var(--line-light); border-bottom: 1px solid var(--line-light); color: var(--muted); background: #f9fbfa; font-size: 9px; font-weight: 800; letter-spacing: .07em; text-align: left; text-transform: uppercase; }
@@ -481,6 +483,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .metadata-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .metadata-error { margin: 0; }
 .metadata-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 4px; }
+.product-markets-field { display: grid; gap: 9px; padding: 0; border: 0; }
+.product-markets-field legend { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 10px; font-weight: 750; }
+.product-markets-field legend svg { color: var(--mint-dark); }
+.product-market-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.market-option { display: inline-flex; min-height: 33px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink-soft); background: #fff; font-size: 9px; font-weight: 700; cursor: pointer; }
+.market-option input { width: auto; height: auto; accent-color: var(--mint-dark); }
+.market-option-selected { border-color: #86d8be; color: var(--green); background: var(--green-soft); }
+
+/* Settings and help */
+.settings-form { display: grid; gap: 17px; }
+.settings-panel { overflow: hidden; }
+.settings-panel-heading { display: flex; align-items: flex-start; gap: 13px; padding: 21px 22px 17px; border-bottom: 1px solid var(--line-light); }
+.settings-panel-heading h2 { font-size: 18px; }
+.settings-panel-heading p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.settings-icon,.help-card-icon { display: grid; width: 41px; height: 41px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: var(--green); background: var(--green-soft); }
+.settings-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 21px 22px; }
+.settings-fields input:disabled,.settings-fields select:disabled { color: var(--muted); background: #f5f8f7; cursor: not-allowed; }
+.settings-actions { display: flex; justify-content: flex-end; }
+.settings-message { margin: 0; }
+.help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
+.help-card { display: flex; min-height: 130px; align-items: flex-start; gap: 14px; padding: 21px; }
+.help-card h2,.help-disclaimer h2 { font-size: 15px; }
+.help-card p,.help-disclaimer p { margin: 6px 0 0; color: var(--ink-soft); font-size: 10px; line-height: 1.65; }
+.help-disclaimer { display: flex; align-items: flex-start; gap: 12px; margin-top: 17px; padding: 20px 22px; color: var(--blue); }
+.help-disclaimer div { color: var(--ink); }
 
 /* Notifications */
 .notification-stats { margin-bottom: 17px; }
@@ -610,6 +637,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .requirement-summary { grid-template-columns: auto minmax(130px,1fr) auto; }.requirement-summary .severity-badge,.requirement-summary .requirement-state { display: none; }.requirement-detail { padding-left: 53px; }
   .document-row { grid-template-columns: auto minmax(140px,1fr) auto; }.document-row .document-date,.document-row .document-status { display: none; }
   .document-register-toolbar { align-items: stretch; flex-direction: column; padding: 14px; }.document-register-toolbar .search-field { width: 100%; }.sort-field { width: 100%; }.sort-field select { width: 100%; }
+  .settings-fields,.help-grid { grid-template-columns: 1fr; }.settings-actions .button { width: 100%; }
   .metadata-dialog-heading,.metadata-form { padding-right: 17px; padding-left: 17px; }.metadata-date-grid { grid-template-columns: 1fr; }.metadata-dialog-actions .button { flex: 1; }
   .notification-panel-heading { min-height: 72px; padding: 16px; }.notification-row { grid-template-columns: auto minmax(0,1fr); gap: 11px; padding: 15px 16px; }.notification-action { grid-column: 2; justify-self: start; }
   .report-actions { display: grid; }.report-header { padding: 16px 17px; }.report-confidentiality { display: none; }.report-title-section { align-items: flex-start; flex-direction: column; gap: 14px; padding: 22px 17px 18px; }.report-title-status { width: 100%; grid-template-columns: auto 1fr; align-items: center; justify-items: start; }.report-title-status > strong { margin: 0 0 0 auto; }.report-title-status > small { grid-column: 2; margin-left: auto; }.report-metadata { grid-template-columns: 1fr; margin-inline: 17px; }.report-metadata > div { border-right: 0; border-bottom: 1px solid var(--line-light); }.report-metadata > div:last-child { border-bottom: 0; }.report-summary-grid { grid-template-columns: 1fr; margin-right: 17px; margin-left: 17px; }.report-section { margin-right: 17px; margin-left: 17px; }.report-product-grid { grid-template-columns: 1fr; }.report-product-grid > div { border-right: 0; }.report-product-grid > div:nth-last-child(2) { border-bottom: 1px solid var(--line-light); }.report-frameworks { align-items: flex-start; flex-direction: column; }.report-frameworks > div { justify-content: flex-start; }.report-footer { align-items: flex-start; flex-direction: column; gap: 12px; padding-right: 17px; padding-left: 17px; }

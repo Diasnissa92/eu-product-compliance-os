@@ -1,5 +1,6 @@
-import { Download, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
+import { ProductExportButton } from "@/components/product/product-export-button";
 import { ProductTable } from "@/components/product/product-table";
 import { getWorkspaceContext } from "@/lib/auth/workspace";
 import { getWorkspaceProducts } from "@/lib/data/products";
@@ -19,7 +20,7 @@ export default async function ProductsPage() {
           <p>Suivez chaque dossier, de la qualification jusqu’à la preuve de conformité.</p>
         </div>
         <div className="heading-actions">
-          <button className="button button-secondary" type="button"><Download size={17} />Exporter</button>
+          <ProductExportButton products={products} />
           <Link className="button button-primary" href="/products/new"><Plus size={18} />Ajouter un produit</Link>
         </div>
       </section>

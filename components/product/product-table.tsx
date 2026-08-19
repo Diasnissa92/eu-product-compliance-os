@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpDown, ChevronRight, Filter, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowUpDown, ChevronRight, Filter, Search } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { ProductVisual } from "@/components/product-visual";
@@ -15,14 +15,17 @@ const filters: Array<{ value: "all" | ComplianceStatus; label: string }> = [
   { value: "blocking", label: "Bloquants" },
 ];
 
+type ProductSort = "recent" | "name-asc" | "name-desc" | "score-desc";
+
 export function ProductTable({ products, compact = false }: { products: Product[]; compact?: boolean }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | ComplianceStatus>("all");
+  const [sort, setSort] = useState<ProductSort>("recent");
   const deferredQuery = useDeferredValue(query);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase("fr");
-    return products.filter((product) => {
+    const result = products.filter((product) => {
       const matchesFilter = filter === "all" || product.status === filter;
       const matchesQuery =
         normalizedQuery.length === 0 ||
@@ -32,7 +35,14 @@ export function ProductTable({ products, compact = false }: { products: Product[
           .includes(normalizedQuery);
       return matchesFilter && matchesQuery;
     });
-  }, [deferredQuery, filter, products]);
+
+    return result.toSorted((left, right) => {
+      if (sort === "name-asc") return left.name.localeCompare(right.name, "fr");
+      if (sort === "name-desc") return right.name.localeCompare(left.name, "fr");
+      if (sort === "score-desc") return right.score - left.score || left.name.localeCompare(right.name, "fr");
+      return 0;
+    });
+  }, [deferredQuery, filter, products, sort]);
 
   return (
     <div className="product-table-wrap">
@@ -47,9 +57,16 @@ export function ProductTable({ products, compact = false }: { products: Product[
               placeholder="Rechercher par produit, SKU, fabricant…"
             />
           </label>
-          <button className="button button-secondary filter-button" type="button">
-            <SlidersHorizontal size={17} /> Filtres avancés
-          </button>
+          <label className="sort-field product-sort-field">
+            <ArrowUpDown size={16} />
+            <span className="sr-only">Trier les produits</span>
+            <select value={sort} onChange={(event) => setSort(event.target.value as ProductSort)}>
+              <option value="recent">Plus récents</option>
+              <option value="name-asc">Nom A–Z</option>
+              <option value="name-desc">Nom Z–A</option>
+              <option value="score-desc">Meilleur score</option>
+            </select>
+          </label>
         </div>
       ) : null}
 
@@ -77,7 +94,11 @@ export function ProductTable({ products, compact = false }: { products: Product[
         <table className="product-table">
           <thead>
             <tr>
-              <th><button type="button">Produit <ArrowUpDown size={13} /></button></th>
+              <th aria-sort={sort === "name-asc" ? "ascending" : sort === "name-desc" ? "descending" : "none"}>
+                <button type="button" onClick={() => setSort((current) => current === "name-asc" ? "name-desc" : "name-asc")}>
+                  Produit <ArrowUpDown size={13} />
+                </button>
+              </th>
               <th>Catégorie</th>
               <th>Marchés</th>
               <th>Progression</th>

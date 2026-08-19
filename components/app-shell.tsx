@@ -23,7 +23,7 @@ const navigation = [
   { href: "/dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
   { href: "/products", label: "Produits", icon: Boxes },
   { href: "/documents", label: "Documents", icon: FileStack },
-  { href: "/settings", label: "Paramètres", icon: Settings, disabled: true },
+  { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
 function Brand() {
@@ -67,16 +67,7 @@ function SidebarContent({ close, workspace }: { close?: () => void; workspace: W
         <span className="nav-label">Espace de travail</span>
         {navigation.map((item) => {
           const Icon = item.icon;
-          const active = !item.disabled && pathname.startsWith(item.href);
-          if (item.disabled) {
-            return (
-              <span className="nav-item nav-item-disabled" key={item.href} title="Disponible prochainement">
-                <Icon size={19} />
-                {item.label}
-                <small>Bientôt</small>
-              </span>
-            );
-          }
+          const active = pathname.startsWith(item.href);
           return (
             <Link className={`nav-item ${active ? "nav-item-active" : ""}`} href={item.href} key={item.href} onClick={close}>
               <Icon size={19} />
@@ -90,11 +81,13 @@ function SidebarContent({ close, workspace }: { close?: () => void; workspace: W
         <span className="insight-icon"><Sparkles size={17} /></span>
         <strong>Diagnostic intelligent</strong>
         <p>Votre portefeuille est analysé à partir des règles V1.</p>
-        <Link href="/products/luma-mini" onClick={close}>Voir un diagnostic</Link>
+        <Link href="/products" onClick={close}>Voir les diagnostics</Link>
       </div>
 
       <div className="sidebar-footer">
-        <button className="nav-item" type="button"><CircleHelp size={19} />Centre d’aide</button>
+        <Link className={`nav-item ${pathname.startsWith("/help") ? "nav-item-active" : ""}`} href="/help" onClick={close}>
+          <CircleHelp size={19} />Centre d’aide
+        </Link>
         {workspace.mode === "authenticated" ? (
           <div className="account-row">
             <span className="avatar">{workspace.userInitials}</span>

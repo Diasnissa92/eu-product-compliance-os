@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MoreHorizontal, Share2 } from "lucide-react";
+import { Check, Share2 } from "lucide-react";
 import { useState } from "react";
 
 export function ProductActions({ productId }: { productId: string }) {
@@ -19,7 +19,6 @@ export function ProductActions({ productId }: { productId: string }) {
         {copied ? <Check size={17} /> : <Share2 size={17} />}
         {copied ? "Lien sécurisé copié" : "Partager la fiche"}
       </button>
-      <button className="icon-button bordered-icon" type="button" aria-label="Plus d’actions"><MoreHorizontal size={19} /></button>
     </div>
   );
 }

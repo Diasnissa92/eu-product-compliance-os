@@ -7,12 +7,15 @@ import { createClient } from "@/lib/supabase/server";
 export type WorkspaceContext = {
   mode: "demo" | "onboarding" | "authenticated";
   userId?: string;
+  userEmail?: string;
   userName: string;
   userInitials: string;
+  jobTitle?: string;
   role: string;
   organizationId?: string;
   organizationName: string;
   organizationInitials: string;
+  organizationCountry?: string;
 };
 
 export const demoWorkspace: WorkspaceContext = {
@@ -44,7 +47,7 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
     supabase.from("profiles").select("full_name, job_title").eq("id", user.id).maybeSingle(),
     supabase
       .from("organization_members")
-      .select("org_id, role, organizations!inner(id, name, slug)")
+      .select("org_id, role, organizations!inner(id, name, slug, country_code)")
       .eq("user_id", user.id)
       .limit(1)
       .maybeSingle(),
@@ -55,8 +58,10 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
     return {
       mode: "onboarding",
       userId: user.id,
+      userEmail: user.email,
       userName,
       userInitials: initials(userName),
+      jobTitle: profile?.job_title ?? undefined,
       role: profile?.job_title || "Administrateur",
       organizationName: "Organisation à créer",
       organizationInitials: "EU",
@@ -67,11 +72,14 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
   return {
     mode: "authenticated",
     userId: user.id,
+    userEmail: user.email,
     userName,
     userInitials: initials(userName),
+    jobTitle: profile?.job_title ?? undefined,
     role: membership.role === "owner" ? "Propriétaire" : membership.role,
     organizationId: organization.id,
     organizationName: organization.name,
     organizationInitials: initials(organization.name),
+    organizationCountry: organization.country_code ?? undefined,
   };
 });
