@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, Download, File, FileSearch, MoreHorizontal, 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { ProductDocument } from "@/lib/types";
+import type { PersistenceContext, ProductDocument } from "@/lib/types";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const allowedMimeTypes: Record<string, string> = {
@@ -18,8 +18,6 @@ const allowedMimeTypes: Record<string, string> = {
   png: "image/png",
   webp: "image/webp",
 };
-
-type PersistenceContext = { organizationId: string; productId: string };
 
 function extensionOf(fileName: string) {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
@@ -213,7 +211,13 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
             <span className="document-date"><small>Ajouté</small><strong>{document.uploadedAt}</strong></span>
             <span className="document-date"><small>Expiration</small><strong>{document.expiresAt ?? "—"}</strong></span>
             <span className={`document-status document-${document.status}`}>
-              {document.status === "verified" ? "Vérifié" : document.status === "review" ? "En analyse" : "Expiré"}
+              {document.status === "verified"
+                ? "Vérifié"
+                : document.status === "review"
+                  ? "En analyse"
+                  : document.status === "rejected"
+                    ? "Refusé"
+                    : "Expiré"}
             </span>
             {document.filePath ? (
               <button className="icon-button" type="button" disabled={downloadingId === document.id} onClick={() => void downloadDocument(document)} aria-label={`Télécharger ${document.name}`}>

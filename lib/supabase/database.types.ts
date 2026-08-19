@@ -455,7 +455,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      review_product_requirement: {
+        Args: {
+          p_decision: string
+          p_document_id: string
+          p_product_requirement_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
@@ -588,4 +595,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

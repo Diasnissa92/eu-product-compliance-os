@@ -79,12 +79,20 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <div><span className="eyebrow">Diagnostic dynamique</span><h2>Checklist de conformité</h2></div>
               <span className="section-meta">{product.requirements.length - openActions}/{product.requirements.length} exigences clôturées</span>
             </div>
-            <RequirementChecklist requirements={product.requirements} />
+            <RequirementChecklist
+              key={product.requirements.map((requirement) => `${requirement.id}:${requirement.status}:${requirement.evidenceDocumentId ?? ""}`).join("|")}
+              requirements={product.requirements}
+              documents={product.documents}
+              persistence={workspace.mode === "authenticated" && workspace.organizationId
+                ? { organizationId: workspace.organizationId, productId: product.id }
+                : undefined}
+            />
           </section>
 
           <section className="panel detail-section" id="documents">
             <div className="panel-heading"><div><span className="eyebrow">Coffre de preuves</span><h2>Documents réglementaires</h2></div></div>
             <DocumentVault
+              key={product.documents.map((document) => `${document.id}:${document.status}`).join("|")}
               documents={product.documents}
               persistence={workspace.mode === "authenticated" && workspace.organizationId
                 ? { organizationId: workspace.organizationId, productId: product.id }

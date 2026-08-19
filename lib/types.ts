@@ -11,17 +11,24 @@ export type Requirement = {
   severity: RequirementSeverity;
   owner?: string;
   dueDate?: string;
+  evidenceDocumentId?: string;
+  evidenceDocumentName?: string;
 };
 
 export type ProductDocument = {
   id: string;
   name: string;
   type: string;
-  status: "verified" | "review" | "expired";
+  status: "verified" | "review" | "rejected" | "expired";
   uploadedAt: string;
   expiresAt?: string;
   size: string;
   filePath?: string;
+};
+
+export type PersistenceContext = {
+  organizationId: string;
+  productId: string;
 };
 
 export type AuditEvent = {

@@ -101,7 +101,7 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
   const [{ data: requirementRows }, { data: documentRows }, { data: auditRows }] = await Promise.all([
     supabase
       .from("product_requirements")
-      .select("id, status, notes, last_checked_at, requirements!inner(id, title, description, requirement_type, mandatory, regulations!inner(code, title))")
+      .select("id, status, notes, last_checked_at, evidence_document_id, requirements!inner(id, title, description, requirement_type, mandatory, regulations!inner(code, title))")
       .eq("org_id", workspace.organizationId)
       .eq("product_id", productId)
       .order("created_at"),
@@ -109,6 +109,18 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     supabase.from("audit_events").select("*").eq("org_id", workspace.organizationId).eq("entity_id", productId).order("created_at", { ascending: false }),
   ]);
 
+  const documents: ProductDocument[] = (documentRows ?? []).map((row) => ({
+    id: row.id,
+    name: row.title,
+    type: row.document_type,
+    status: row.status === "valid" ? "verified" : row.status === "invalid" ? "rejected" : row.status === "expired" ? "expired" : "review",
+    uploadedAt: formatDate(row.created_at),
+    expiresAt: row.expiry_date ? formatDate(row.expiry_date) : undefined,
+    size: documentSize(row.metadata),
+    filePath: row.file_path ?? undefined,
+  }));
+
+  const documentNames = new Map(documents.map((document) => [document.id, document.name]));
   const requirements: Requirement[] = (requirementRows ?? []).map((row) => ({
     id: row.id,
     title: row.requirements.title,
@@ -117,17 +129,8 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     status: mapRequirementStatus(row.status),
     severity: mapRequirementSeverity(row.requirements.requirement_type, row.requirements.mandatory),
     dueDate: row.last_checked_at ? formatDate(row.last_checked_at) : undefined,
-  }));
-
-  const documents: ProductDocument[] = (documentRows ?? []).map((row) => ({
-    id: row.id,
-    name: row.title,
-    type: row.document_type,
-    status: row.status === "valid" ? "verified" : row.status === "expired" || row.status === "invalid" ? "expired" : "review",
-    uploadedAt: formatDate(row.created_at),
-    expiresAt: row.expiry_date ? formatDate(row.expiry_date) : undefined,
-    size: documentSize(row.metadata),
-    filePath: row.file_path ?? undefined,
+    evidenceDocumentId: row.evidence_document_id ?? undefined,
+    evidenceDocumentName: row.evidence_document_id ? documentNames.get(row.evidence_document_id) : undefined,
   }));
 
   const audit: AuditEvent[] = (auditRows ?? []).map((row) => ({
