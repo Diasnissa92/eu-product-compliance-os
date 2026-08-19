@@ -113,8 +113,17 @@ function SidebarContent({ close, workspace }: { close?: () => void; workspace: W
   );
 }
 
-export function AppShell({ children, workspace }: { children: React.ReactNode; workspace: WorkspaceContext }) {
+export function AppShell({
+  children,
+  workspace,
+  notificationCount,
+}: {
+  children: React.ReactNode;
+  workspace: WorkspaceContext;
+  notificationCount: number;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <div className="app-shell">
@@ -137,10 +146,14 @@ export function AppShell({ children, workspace }: { children: React.ReactNode; w
             {workspace.mode === "authenticated" ? "Données sécurisées" : "Données de démonstration"}
           </div>
           <div className="topbar-actions">
-            <button className="icon-button notification-button" type="button" aria-label="Notifications">
+            <Link
+              className={`icon-button notification-button ${pathname.startsWith("/notifications") ? "notification-button-active" : ""}`}
+              href="/notifications"
+              aria-label={notificationCount ? `${notificationCount} notification${notificationCount > 1 ? "s" : ""}` : "Aucune notification"}
+            >
               <Bell size={19} />
-              <span aria-label="3 notifications">3</span>
-            </button>
+              {notificationCount ? <span aria-hidden="true">{notificationCount > 9 ? "9+" : notificationCount}</span> : null}
+            </Link>
             <span className="topbar-divider" />
             <span className="avatar avatar-small">{workspace.userInitials}</span>
           </div>

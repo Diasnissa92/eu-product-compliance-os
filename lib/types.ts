@@ -39,6 +39,26 @@ export type PortfolioDocument = ProductDocument & {
   issuingBody?: string;
 };
 
+export type ComplianceNotificationKind = "expired" | "expiring" | "rejected" | "review";
+export type ComplianceNotificationTone = "danger" | "warning" | "neutral";
+
+export type ComplianceNotification = {
+  id: string;
+  kind: ComplianceNotificationKind;
+  tone: ComplianceNotificationTone;
+  title: string;
+  detail: string;
+  documentId: string;
+  documentName: string;
+  productId: string;
+  productName: string;
+  actionHref: string;
+  actionLabel: string;
+  dueDate?: string;
+  daysRemaining?: number;
+  createdAt: string;
+};
+
 export type PersistenceContext = {
   organizationId: string;
   productId: string;

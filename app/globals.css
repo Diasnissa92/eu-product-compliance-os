@@ -247,7 +247,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .icon-button:hover { background: #edf3f1; }
 .notification-button { position: relative; }
-.notification-button span { position: absolute; top: 0; right: -2px; display: grid; width: 16px; height: 16px; place-items: center; border: 2px solid var(--surface); border-radius: 50%; color: #fff; background: var(--red); font-size: 8px; font-weight: 800; }
+.notification-button-active { color: var(--green); background: var(--green-soft); }
+.notification-button span { position: absolute; top: -1px; right: -4px; display: grid; min-width: 17px; height: 17px; place-items: center; padding: 0 3px; border: 2px solid var(--surface); border-radius: 99px; color: #fff; background: var(--red); font-size: 8px; font-weight: 800; }
 .workspace-content { width: min(1460px, 100%); min-width: 0; margin: 0 auto; padding: 36px 38px 56px; }
 .mobile-menu, .mobile-navigation { display: none; }
 
@@ -480,6 +481,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .metadata-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .metadata-error { margin: 0; }
 .metadata-dialog-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 4px; }
+
+/* Notifications */
+.notification-stats { margin-bottom: 17px; }
+.notification-panel { overflow: hidden; }
+.notification-panel-heading { display: flex; min-height: 82px; align-items: center; justify-content: space-between; gap: 18px; padding: 19px 22px; border-bottom: 1px solid var(--line-light); }
+.notification-panel-heading .eyebrow { margin-bottom: 4px; }
+.notification-total { display: inline-flex; min-height: 28px; align-items: center; padding: 0 10px; border-radius: 99px; color: var(--green); background: var(--green-soft); font-size: 9px; font-weight: 800; }
+.notification-list { display: grid; }
+.notification-row { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 15px; min-height: 94px; padding: 17px 22px; border-bottom: 1px solid var(--line-light); }
+.notification-row:last-child { border-bottom: 0; }
+.notification-row:hover { background: #fbfdfc; }
+.notification-icon { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 12px; }
+.notification-danger { color: var(--red); background: var(--red-soft); }
+.notification-warning { color: var(--amber); background: var(--amber-soft); }
+.notification-neutral { color: var(--blue); background: var(--blue-soft); }
+.notification-copy { min-width: 0; }
+.notification-title-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.notification-title-line strong { font-size: 12px; }
+.notification-kind { display: inline-flex; min-height: 20px; align-items: center; padding: 0 7px; border-radius: 99px; font-size: 8px; font-weight: 800; }
+.notification-kind-danger { color: var(--red); background: var(--red-soft); }
+.notification-kind-warning { color: var(--amber); background: var(--amber-soft); }
+.notification-kind-neutral { color: var(--blue); background: var(--blue-soft); }
+.notification-copy p { margin: 4px 0 2px; color: var(--ink-soft); font-size: 10px; }
+.notification-copy small { display: block; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-action { display: inline-flex; align-items: center; gap: 5px; color: var(--navy-700); font-size: 10px; font-weight: 750; }
+.notification-action:hover { color: var(--mint-dark); }
+.notification-empty { min-height: 320px; }
+.notification-empty > svg { color: var(--green); }
 .audit-list { margin-top: 17px; }.audit-row { position: relative; display: grid; grid-template-columns: 17px 1fr; gap: 9px; padding-bottom: 18px; }.audit-row:not(:last-child)::before { position: absolute; top: 12px; bottom: 0; left: 5px; width: 1px; background: var(--line); content: ""; }.audit-dot { position: relative; z-index: 1; width: 11px; height: 11px; margin-top: 3px; border: 3px solid #d5eee6; border-radius: 50%; background: var(--green); }.audit-row strong { display: block; font-size: 10px; }.audit-row p { margin: 2px 0; color: var(--ink-soft); font-size: 9px; }.audit-row small { color: var(--muted); font-size: 8px; }
 .score-panel { display: grid; place-items: center; padding: 22px; text-align: center; }.score-panel .compliance-ring { margin: 8px 0 6px; }.score-panel > strong { font-size: 12px; }.score-panel > p { margin: 5px 0 14px; color: var(--muted); font-size: 9px; }
 .score-breakdown { display: grid; width: 100%; gap: 7px; padding-top: 13px; border-top: 1px solid var(--line-light); text-align: left; }.score-breakdown span { display: flex; align-items: center; gap: 7px; color: var(--ink-soft); font-size: 9px; }.score-breakdown svg { color: var(--green); }
@@ -544,6 +573,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .document-row { grid-template-columns: auto minmax(140px,1fr) auto; }.document-row .document-date,.document-row .document-status { display: none; }
   .document-register-toolbar { align-items: stretch; flex-direction: column; padding: 14px; }.document-register-toolbar .search-field { width: 100%; }.sort-field { width: 100%; }.sort-field select { width: 100%; }
   .metadata-dialog-heading,.metadata-form { padding-right: 17px; padding-left: 17px; }.metadata-date-grid { grid-template-columns: 1fr; }.metadata-dialog-actions .button { flex: 1; }
+  .notification-panel-heading { min-height: 72px; padding: 16px; }.notification-row { grid-template-columns: auto minmax(0,1fr); gap: 11px; padding: 15px 16px; }.notification-action { grid-column: 2; justify-self: start; }
   .product-side-column { grid-template-columns: 1fr; }.score-panel { grid-row: auto; }.dossier-panel { grid-column: auto; }
   .form-grid,.market-picker,.diagnostic-grid { grid-template-columns: 1fr; }.diagnostic-grid > div { border-right: 0; border-bottom: 1px solid var(--line-light); }.diagnostic-grid > div:last-child { border-bottom: 0; }
   .creation-content { min-height: 540px; padding: 28px 18px; }.creation-content legend { font-size: 22px; }.creation-footer { padding-inline: 16px; }.creation-footer .button { padding-inline: 11px; }

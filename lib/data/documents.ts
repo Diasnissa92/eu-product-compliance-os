@@ -5,6 +5,7 @@ import { products as demoProducts } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
 import type { PortfolioDocument, ProductDocument } from "@/lib/types";
+import { cache } from "react";
 
 type DocumentRow = Tables<"documents">;
 
@@ -52,14 +53,12 @@ function demoDocuments(): PortfolioDocument[] {
   );
 }
 
-export async function getWorkspaceDocuments(workspace: WorkspaceContext): Promise<PortfolioDocument[]> {
-  if (workspace.mode !== "authenticated" || !workspace.organizationId) return demoDocuments();
-
+const getAuthenticatedDocuments = cache(async (organizationId: string): Promise<PortfolioDocument[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("documents")
     .select("*, product:products!documents_product_id_fkey(id, name, sku, category)")
-    .eq("org_id", workspace.organizationId)
+    .eq("org_id", organizationId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Impossible de charger les documents : ${error.message}`);
@@ -87,6 +86,11 @@ export async function getWorkspaceDocuments(workspace: WorkspaceContext): Promis
       issuingBody: row.issuing_body ?? undefined,
     } satisfies PortfolioDocument];
   });
+});
+
+export async function getWorkspaceDocuments(workspace: WorkspaceContext): Promise<PortfolioDocument[]> {
+  if (workspace.mode !== "authenticated" || !workspace.organizationId) return demoDocuments();
+  return getAuthenticatedDocuments(workspace.organizationId);
 }
 
 export function getDocumentStats(documents: PortfolioDocument[]) {

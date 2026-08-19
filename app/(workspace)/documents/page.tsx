@@ -7,7 +7,8 @@ import { getDocumentStats, getWorkspaceDocuments } from "@/lib/data/documents";
 
 export const metadata = { title: "Documents" };
 
-export default async function DocumentsPage() {
+export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const { edit } = await searchParams;
   const workspace = await getWorkspaceContext();
   const documents = await getWorkspaceDocuments(workspace);
   const stats = getDocumentStats(documents);
@@ -34,7 +35,7 @@ export default async function DocumentsPage() {
 
       <section className="panel documents-panel">
         {documents.length ? (
-          <DocumentRegister documents={documents} />
+          <DocumentRegister documents={documents} initialEditId={edit} />
         ) : (
           <div className="empty-state">
             <Files size={28} />

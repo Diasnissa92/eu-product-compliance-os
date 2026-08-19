@@ -49,7 +49,7 @@ function expiryState(document: PortfolioDocument) {
   return { label: document.expiresAt ?? "Date renseignée", tone: "safe" };
 }
 
-export function DocumentRegister({ documents }: { documents: PortfolioDocument[] }) {
+export function DocumentRegister({ documents, initialEditId }: { documents: PortfolioDocument[]; initialEditId?: string }) {
   const router = useRouter();
   const [localDocuments, setLocalDocuments] = useState(documents);
   const [query, setQuery] = useState("");
@@ -58,7 +58,9 @@ export function DocumentRegister({ documents }: { documents: PortfolioDocument[]
   const [downloadingId, setDownloadingId] = useState<string>();
   const [error, setError] = useState<string>();
   const [message, setMessage] = useState<string>();
-  const [editingDocument, setEditingDocument] = useState<PortfolioDocument>();
+  const [editingDocument, setEditingDocument] = useState<PortfolioDocument | undefined>(() =>
+    initialEditId ? documents.find((document) => document.id === initialEditId) : undefined,
+  );
   const deferredQuery = useDeferredValue(query);
 
   const filteredDocuments = useMemo(() => {
@@ -91,7 +93,13 @@ export function DocumentRegister({ documents }: { documents: PortfolioDocument[]
     setLocalDocuments((current) => current.map((document) => document.id === updatedDocument.id ? updatedDocument : document));
     setEditingDocument(undefined);
     setMessage(`Les informations de ${updatedDocument.name} sont enregistrées.`);
-    router.refresh();
+    if (initialEditId) router.replace("/documents", { scroll: false });
+    else router.refresh();
+  }
+
+  function closeMetadata() {
+    setEditingDocument(undefined);
+    if (initialEditId) router.replace("/documents", { scroll: false });
   }
 
   async function downloadDocument(document: PortfolioDocument) {
@@ -249,7 +257,7 @@ export function DocumentRegister({ documents }: { documents: PortfolioDocument[]
       ) : null}
 
       {editingDocument ? (
-        <DocumentMetadataDialog document={editingDocument} onClose={() => setEditingDocument(undefined)} onSaved={saveMetadata} />
+        <DocumentMetadataDialog document={editingDocument} onClose={closeMetadata} onSaved={saveMetadata} />
       ) : null}
     </div>
   );
