@@ -26,6 +26,19 @@ export type ProductDocument = {
   filePath?: string;
 };
 
+export type PortfolioDocument = ProductDocument & {
+  organizationId?: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  productCategory: string;
+  createdAt: string;
+  expiresOn?: string;
+  issueDate?: string;
+  issueOn?: string;
+  issuingBody?: string;
+};
+
 export type PersistenceContext = {
   organizationId: string;
   productId: string;

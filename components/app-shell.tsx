@@ -22,7 +22,7 @@ import type { WorkspaceContext } from "@/lib/auth/workspace";
 const navigation = [
   { href: "/dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
   { href: "/products", label: "Produits", icon: Boxes },
-  { href: "/documents", label: "Documents", icon: FileStack, disabled: true },
+  { href: "/documents", label: "Documents", icon: FileStack },
   { href: "/settings", label: "Paramètres", icon: Settings, disabled: true },
 ];
 
