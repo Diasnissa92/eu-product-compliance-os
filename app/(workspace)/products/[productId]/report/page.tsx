@@ -16,6 +16,8 @@ import { StatusPill } from "@/components/status-pill";
 import { getWorkspaceContext } from "@/lib/auth/workspace";
 import { getWorkspaceProduct } from "@/lib/data/products";
 import { buildRegulatoryReportSummary, documentStatusCopy, requirementStatusCopy } from "@/lib/report";
+import type { RegulatoryReportPdfData } from "@/lib/report-pdf";
+import { complianceStatusCopy } from "@/lib/status";
 
 const severityCopy = {
   low: "Secondaire",
@@ -35,12 +37,46 @@ export default async function RegulatoryReportPage({ params }: { params: Promise
     dateStyle: "long",
     timeStyle: "short",
   }).format(new Date());
+  const pdfReport: RegulatoryReportPdfData = {
+    productName: product.name,
+    sku: product.sku,
+    category: product.category,
+    manufacturer: product.manufacturer,
+    originCountry: product.originCountry,
+    destinationMarkets: product.destinationMarkets,
+    frameworks: product.frameworks,
+    organizationName: workspace.organizationName,
+    generatedAt,
+    generatedBy: workspace.userName,
+    updatedAt: product.updatedAt,
+    score: product.score,
+    status: complianceStatusCopy[product.status].label,
+    closedRequirements: summary.closedRequirements,
+    totalRequirements: summary.totalRequirements,
+    verifiedDocuments: summary.verifiedDocuments,
+    totalDocuments: summary.totalDocuments,
+    nextDeadline: product.nextDeadline ?? "Aucune",
+    requirements: product.requirements.map((requirement) => ({
+      title: requirement.title,
+      regulation: requirement.regulation,
+      severity: severityCopy[requirement.severity],
+      status: requirementStatusCopy[requirement.status],
+      evidence: requirement.evidenceDocumentName ?? "Aucune",
+    })),
+    documents: product.documents.map((document) => ({
+      name: document.name,
+      type: document.type,
+      status: documentStatusCopy[document.status],
+      uploadedAt: document.uploadedAt,
+      expiresAt: document.expiresAt ?? "Non renseignée",
+    })),
+  };
 
   return (
     <main className="report-shell">
       <div className="report-screen-toolbar report-screen-only">
         <Link className="back-link" href={`/products/${product.id}`}><ArrowLeft size={16} />Retour au dossier</Link>
-        <RegulatoryReportActions productName={product.name} />
+        <RegulatoryReportActions report={pdfReport} />
       </div>
 
       <article className="regulatory-report">
