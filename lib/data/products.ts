@@ -4,7 +4,8 @@ import { getProduct as getDemoProduct, products as demoProducts } from "@/lib/de
 import type { WorkspaceContext } from "@/lib/auth/workspace";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
-import type { AuditEvent, ComplianceStatus, Product, ProductDocument, Requirement, RequirementSeverity, RequirementStatus } from "@/lib/types";
+import { personInitials } from "@/lib/team";
+import type { AuditEvent, ComplianceStatus, Product, ProductDocument, Requirement, RequirementComment, RequirementSeverity, RequirementStatus } from "@/lib/types";
 
 type ProductRow = Tables<"products">;
 
@@ -100,16 +101,39 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
 
   if (error || !productRow) return undefined;
 
-  const [{ data: requirementRows }, { data: documentRows }, { data: auditRows }] = await Promise.all([
+  const [{ data: requirementRows }, { data: documentRows }, { data: auditRows }, { data: commentRows }] = await Promise.all([
     supabase
       .from("product_requirements")
-      .select("id, status, notes, last_checked_at, evidence_document_id, requirements!inner(id, title, description, requirement_type, mandatory, source_reference, effective_from, updated_at, regulations!inner(code, title, source_url, effective_from, updated_at))")
+      .select("id, status, notes, last_checked_at, evidence_document_id, assigned_to, due_date, requirements!inner(id, title, description, requirement_type, mandatory, source_reference, effective_from, updated_at, regulations!inner(code, title, source_url, effective_from, updated_at))")
       .eq("org_id", workspace.organizationId)
       .eq("product_id", productId)
       .order("created_at"),
     supabase.from("documents").select("*").eq("org_id", workspace.organizationId).eq("product_id", productId).order("created_at", { ascending: false }),
     supabase.from("audit_events").select("*").eq("org_id", workspace.organizationId).eq("entity_id", productId).order("created_at", { ascending: false }),
+    supabase.from("requirement_comments").select("id, product_requirement_id, author_id, body, created_at").eq("org_id", workspace.organizationId).eq("product_id", productId).order("created_at"),
   ]);
+
+  const profileIds = [...new Set([
+    ...(requirementRows ?? []).map((row) => row.assigned_to).filter((value): value is string => Boolean(value)),
+    ...(commentRows ?? []).map((row) => row.author_id),
+  ])];
+  const { data: collaborationProfiles } = profileIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", profileIds)
+    : { data: [] };
+  const profileNames = new Map((collaborationProfiles ?? []).map((profile) => [profile.id, profile.full_name || "Membre de l’organisation"]));
+  const commentsByRequirement = new Map<string, RequirementComment[]>();
+  for (const comment of commentRows ?? []) {
+    const authorName = profileNames.get(comment.author_id) || "Membre de l’organisation";
+    const mappedComment: RequirementComment = {
+      id: comment.id,
+      body: comment.body,
+      authorId: comment.author_id,
+      authorName,
+      authorInitials: personInitials(authorName),
+      createdAt: formatDate(comment.created_at),
+    };
+    commentsByRequirement.set(comment.product_requirement_id, [...(commentsByRequirement.get(comment.product_requirement_id) ?? []), mappedComment]);
+  }
 
   const documents: ProductDocument[] = (documentRows ?? []).map((row) => ({
     id: row.id,
@@ -142,7 +166,11 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     lastUpdated: formatDate(row.requirements.updated_at || row.requirements.regulations.updated_at),
     status: mapRequirementStatus(row.status),
     severity: mapRequirementSeverity(row.requirements.requirement_type, row.requirements.mandatory),
-    dueDate: undefined,
+    assigneeId: row.assigned_to ?? undefined,
+    owner: row.assigned_to ? profileNames.get(row.assigned_to) : undefined,
+    dueDate: row.due_date ? formatDate(row.due_date) : undefined,
+    dueDateValue: row.due_date ?? undefined,
+    comments: commentsByRequirement.get(row.id) ?? [],
     evidenceDocumentId: row.evidence_document_id ?? undefined,
     evidenceDocumentName: row.evidence_document_id ? documentNames.get(row.evidence_document_id) : undefined,
   }));

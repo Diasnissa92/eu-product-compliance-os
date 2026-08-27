@@ -1,6 +1,27 @@
 export type ComplianceStatus = "compliant" | "incomplete" | "risk" | "blocking";
 export type RequirementStatus = "verified" | "pending" | "missing" | "rejected" | "not-applicable";
 export type RequirementSeverity = "low" | "medium" | "high" | "blocking";
+export type TeamRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
+
+export type TeamMember = {
+  userId: string;
+  fullName: string;
+  initials: string;
+  email?: string;
+  jobTitle?: string;
+  role: TeamRole;
+  joinedAt: string;
+  status: "active" | "invited";
+};
+
+export type RequirementComment = {
+  id: string;
+  body: string;
+  authorId: string;
+  authorName: string;
+  authorInitials: string;
+  createdAt: string;
+};
 
 export type Requirement = {
   id: string;
@@ -15,8 +36,11 @@ export type Requirement = {
   lastUpdated?: string;
   status: RequirementStatus;
   severity: RequirementSeverity;
+  assigneeId?: string;
   owner?: string;
   dueDate?: string;
+  dueDateValue?: string;
+  comments?: RequirementComment[];
   evidenceDocumentId?: string;
   evidenceDocumentName?: string;
 };

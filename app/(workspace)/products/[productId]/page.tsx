@@ -24,12 +24,16 @@ import { StatusPill } from "@/components/status-pill";
 import { countOpenActions } from "@/lib/compliance";
 import { getWorkspaceContext } from "@/lib/auth/workspace";
 import { getWorkspaceProduct } from "@/lib/data/products";
+import { getWorkspaceTeam } from "@/lib/data/team";
 import { complianceStatusCopy } from "@/lib/status";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = await params;
   const workspace = await getWorkspaceContext();
-  const product = await getWorkspaceProduct(workspace, productId);
+  const [product, team] = await Promise.all([
+    getWorkspaceProduct(workspace, productId),
+    getWorkspaceTeam(workspace),
+  ]);
   if (!product) notFound();
 
   const openActions = countOpenActions(product.requirements);
@@ -88,6 +92,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               requirements={product.requirements}
               documents={product.documents}
               persistence={persistence}
+              collaboration={{
+                members: team,
+                canAssign: ["Propriétaire", "Administrateur", "Contributeur", "owner", "admin", "editor"].includes(workspace.role),
+                canComment: ["Propriétaire", "Administrateur", "Contributeur", "Vérificateur", "owner", "admin", "editor", "reviewer"].includes(workspace.role),
+                currentUserId: workspace.userId,
+                currentUserName: workspace.userName,
+                currentUserInitials: workspace.userInitials,
+              }}
             />
           </section>
 

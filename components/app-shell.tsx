@@ -10,6 +10,7 @@ import {
   Menu,
   Settings,
   Sparkles,
+  UsersRound,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -23,6 +24,7 @@ const navigation = [
   { href: "/dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
   { href: "/products", label: "Produits", icon: Boxes },
   { href: "/documents", label: "Documents", icon: FileStack },
+  { href: "/team", label: "Équipe", icon: UsersRound },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
