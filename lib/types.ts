@@ -7,6 +7,12 @@ export type Requirement = {
   title: string;
   description: string;
   regulation: string;
+  regulationTitle?: string;
+  sourceUrl?: string;
+  sourceReference?: string;
+  applicableReason?: string;
+  effectiveFrom?: string;
+  lastUpdated?: string;
   status: RequirementStatus;
   severity: RequirementSeverity;
   owner?: string;

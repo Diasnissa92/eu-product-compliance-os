@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RegulatoryReportActions } from "@/components/product/regulatory-report-actions";
+import { BrandMark } from "@/components/brand-mark";
 import { StatusPill } from "@/components/status-pill";
 import { getWorkspaceContext } from "@/lib/auth/workspace";
 import { getWorkspaceProduct } from "@/lib/data/products";
@@ -58,7 +59,9 @@ export default async function RegulatoryReportPage({ params }: { params: Promise
     nextDeadline: product.nextDeadline ?? "Aucune",
     requirements: product.requirements.map((requirement) => ({
       title: requirement.title,
-      regulation: requirement.regulation,
+      regulation: requirement.sourceReference
+        ? `${requirement.regulation} — ${requirement.sourceReference}`
+        : requirement.regulation,
       severity: severityCopy[requirement.severity],
       status: requirementStatusCopy[requirement.status],
       evidence: requirement.evidenceDocumentName ?? "Aucune",
@@ -82,7 +85,7 @@ export default async function RegulatoryReportPage({ params }: { params: Promise
       <article className="regulatory-report">
         <header className="report-header">
           <div className="report-brand">
-            <span><ShieldCheck size={23} /></span>
+            <span><BrandMark size={24} /></span>
             <div><strong>EU Compliance</strong><small>Product OS</small></div>
           </div>
           <div className="report-confidentiality"><ShieldCheck size={14} />Fiche interne sécurisée</div>
@@ -137,7 +140,12 @@ export default async function RegulatoryReportPage({ params }: { params: Promise
                 {product.requirements.map((requirement) => (
                   <tr key={requirement.id}>
                     <td><strong>{requirement.title}</strong></td>
-                    <td>{requirement.regulation}</td>
+                    <td>
+                      <strong>{requirement.regulation}</strong>
+                      {requirement.sourceReference || requirement.regulationTitle ? (
+                        <small>{requirement.sourceReference ?? requirement.regulationTitle}</small>
+                      ) : null}
+                    </td>
                     <td>{severityCopy[requirement.severity]}</td>
                     <td><span className={`report-state report-state-${requirement.status}`}>{requirementStatusCopy[requirement.status]}</span></td>
                     <td>{requirement.evidenceDocumentName ?? "—"}</td>

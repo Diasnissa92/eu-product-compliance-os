@@ -20,10 +20,12 @@ function mapComplianceStatus(row: ProductRow): ComplianceStatus {
 }
 
 function productTone(row: ProductRow) {
-  if (row.status === "ready") return "sage";
-  if (row.status === "blocked") return "rose";
-  if (row.risk_level === "high") return "amber";
-  return "blue";
+  const category = `${row.category ?? ""} ${row.sector ?? ""}`.toLocaleLowerCase("fr");
+  if (category.includes("construction")) return "rose";
+  if (category.includes("jouet")) return "amber";
+  if (category.includes("radio") || category.includes("électron")) return "blue";
+  if (category.includes("électri") || category.includes("éclairage")) return "sage";
+  return "slate";
 }
 
 function baseProduct(row: ProductRow): Product {
@@ -101,7 +103,7 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
   const [{ data: requirementRows }, { data: documentRows }, { data: auditRows }] = await Promise.all([
     supabase
       .from("product_requirements")
-      .select("id, status, notes, last_checked_at, evidence_document_id, requirements!inner(id, title, description, requirement_type, mandatory, regulations!inner(code, title))")
+      .select("id, status, notes, last_checked_at, evidence_document_id, requirements!inner(id, title, description, requirement_type, mandatory, source_reference, effective_from, updated_at, regulations!inner(code, title, source_url, effective_from, updated_at))")
       .eq("org_id", workspace.organizationId)
       .eq("product_id", productId)
       .order("created_at"),
@@ -126,6 +128,18 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     title: row.requirements.title,
     description: row.requirements.description || "Exigence réglementaire à documenter.",
     regulation: row.requirements.regulations.code,
+    regulationTitle: row.requirements.regulations.title,
+    sourceUrl: row.requirements.regulations.source_url,
+    sourceReference: row.requirements.source_reference ?? undefined,
+    applicableReason: productRow.category
+      ? `Exigence identifiée pour la catégorie « ${productRow.category} » et les marchés sélectionnés.`
+      : "Exigence identifiée à partir de la qualification réglementaire du produit.",
+    effectiveFrom: row.requirements.effective_from
+      ? formatDate(row.requirements.effective_from)
+      : row.requirements.regulations.effective_from
+        ? formatDate(row.requirements.regulations.effective_from)
+        : undefined,
+    lastUpdated: formatDate(row.requirements.updated_at || row.requirements.regulations.updated_at),
     status: mapRequirementStatus(row.status),
     severity: mapRequirementSeverity(row.requirements.requirement_type, row.requirements.mandatory),
     dueDate: undefined,

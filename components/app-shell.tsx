@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Menu,
   Settings,
-  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
@@ -17,6 +16,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { BrandMark } from "@/components/brand-mark";
 import type { WorkspaceContext } from "@/lib/auth/workspace";
 
 const navigation = [
@@ -30,7 +30,7 @@ function Brand() {
   return (
     <Link className="brand" href="/dashboard" aria-label="EU Product Compliance OS, accueil">
       <span className="brand-mark" aria-hidden="true">
-        <ShieldCheck size={22} strokeWidth={2.2} />
+        <BrandMark size={24} />
       </span>
       <span>
         <strong>EU Compliance</strong>

@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 
@@ -72,7 +73,7 @@ export function LoginForm() {
   return (
     <div className="auth-card">
       <div className="auth-brand">
-        <span className="brand-mark"><ShieldCheck size={24} /></span>
+        <span className="brand-mark"><BrandMark size={25} /></span>
         <span><strong>EU Compliance</strong><small>Product OS</small></span>
       </div>
       <span className="auth-icon"><LockKeyhole size={21} /></span>
