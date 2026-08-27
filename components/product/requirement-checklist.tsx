@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, AlertTriangle, Check, CheckCircle2, ChevronDown, CircleDashed, FileSearch, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, BookOpenCheck, Check, CheckCircle2, ChevronDown, CircleDashed, ExternalLink, FileSearch, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { requirementStatusCopy } from "@/lib/status";
@@ -89,6 +89,13 @@ export function RequirementChecklist({ requirements, documents, persistence }: R
 
   return (
     <div>
+      <div className="regulatory-trust-note">
+        <span><BookOpenCheck size={18} /></span>
+        <div>
+          <strong>Diagnostic traçable</strong>
+          <p>Chaque exigence indique son référentiel, sa justification et, lorsqu’elle est disponible, sa source officielle.</p>
+        </div>
+      </div>
       {message ? <div className="inline-message" aria-live="polite"><CheckCircle2 size={16} />{message}</div> : null}
       {error ? <div className="inline-message inline-message-error" role="alert"><AlertCircle size={16} />{error}</div> : null}
       <div className="requirements-list">
@@ -124,6 +131,28 @@ export function RequirementChecklist({ requirements, documents, persistence }: R
                     <div><dt>Échéance</dt><dd>{requirement.dueDate ?? "Aucune échéance"}</dd></div>
                     <div><dt>Niveau</dt><dd>{requirement.severity === "blocking" ? "Bloquant" : requirement.severity}</dd></div>
                   </dl>
+                  <div className="requirement-source-card">
+                    <div>
+                      <span className="requirement-source-icon"><BookOpenCheck size={16} /></span>
+                      <span>
+                        <small>Référentiel officiel</small>
+                        <strong>{requirement.regulationTitle ?? requirement.regulation}</strong>
+                        <em>{requirement.sourceReference ? `${requirement.regulation} · ${requirement.sourceReference}` : requirement.regulation}</em>
+                      </span>
+                    </div>
+                    {requirement.sourceUrl ? (
+                      <a href={requirement.sourceUrl} target="_blank" rel="noreferrer">
+                        Consulter la source <ExternalLink size={13} />
+                      </a>
+                    ) : <span className="source-unavailable">Source à compléter</span>}
+                  </div>
+                  <div className="requirement-applicability">
+                    <div><small>Pourquoi cette règle s’applique</small><p>{requirement.applicableReason ?? "Règle sélectionnée à partir de la catégorie, du rôle opérateur et des marchés déclarés."}</p></div>
+                    <div className="requirement-version">
+                      {requirement.effectiveFrom ? <span>Applicable depuis <strong>{requirement.effectiveFrom}</strong></span> : null}
+                      {requirement.lastUpdated ? <span>Référentiel vérifié le <strong>{requirement.lastUpdated}</strong></span> : null}
+                    </div>
+                  </div>
                   {requirement.evidenceDocumentName ? (
                     <p className="linked-evidence"><CheckCircle2 size={14} />Preuve liée : <strong>{requirement.evidenceDocumentName}</strong></p>
                   ) : null}
