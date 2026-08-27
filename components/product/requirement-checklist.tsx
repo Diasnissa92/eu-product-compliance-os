@@ -1,11 +1,11 @@
 "use client";
 
-import { AlertCircle, AlertTriangle, BookOpenCheck, Check, CheckCircle2, ChevronDown, CircleDashed, ExternalLink, FileSearch, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, BookOpenCheck, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDashed, ExternalLink, FileSearch, MessageSquareText, Save, Send, UserRoundCheck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { requirementStatusCopy } from "@/lib/status";
 import { createClient } from "@/lib/supabase/client";
-import type { PersistenceContext, ProductDocument, Requirement, RequirementStatus } from "@/lib/types";
+import type { PersistenceContext, ProductDocument, Requirement, RequirementComment, RequirementStatus, TeamMember } from "@/lib/types";
 
 const statusIcon: Record<RequirementStatus, typeof Check> = {
   verified: Check,
@@ -19,19 +19,42 @@ type RequirementChecklistProps = {
   requirements: Requirement[];
   documents: ProductDocument[];
   persistence?: PersistenceContext;
+  collaboration: {
+    members: TeamMember[];
+    canAssign: boolean;
+    canComment: boolean;
+    currentUserId?: string;
+    currentUserName: string;
+    currentUserInitials: string;
+  };
 };
 
-export function RequirementChecklist({ requirements, documents, persistence }: RequirementChecklistProps) {
+export function RequirementChecklist({ requirements, documents, persistence, collaboration }: RequirementChecklistProps) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(requirements[0]?.id ?? null);
   const [localRequirements, setLocalRequirements] = useState(requirements);
   const [selectedDocuments, setSelectedDocuments] = useState<Record<string, string>>(() =>
     Object.fromEntries(requirements.map((requirement) => [requirement.id, requirement.evidenceDocumentId ?? ""])),
   );
+  const [assignees, setAssignees] = useState<Record<string, string>>(() =>
+    Object.fromEntries(requirements.map((requirement) => [requirement.id, requirement.assigneeId ?? ""])),
+  );
+  const [dueDates, setDueDates] = useState<Record<string, string>>(() =>
+    Object.fromEntries(requirements.map((requirement) => [requirement.id, requirement.dueDateValue ?? ""])),
+  );
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [reviewingId, setReviewingId] = useState<string>();
+  const [collaborationAction, setCollaborationAction] = useState<string>();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const availableDocuments = documents.filter((document) => document.status !== "expired");
+  const activeMembers = collaboration.members.filter((member) => member.status === "active");
+
+  function formatLocalDate(value: string) {
+    return value
+      ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${value}T12:00:00`))
+      : undefined;
+  }
 
   async function reviewRequirement(requirement: Requirement, decision: "approved" | "rejected") {
     const documentId = selectedDocuments[requirement.id];
@@ -85,6 +108,77 @@ export function RequirementChecklist({ requirements, documents, persistence }: R
       : "Preuve refusée. Le risque du dossier a été actualisé.");
     setReviewingId(undefined);
     router.refresh();
+  }
+
+  async function saveAssignment(requirement: Requirement) {
+    const assigneeId = assignees[requirement.id] || null;
+    const dueDate = dueDates[requirement.id] || null;
+    const assignee = collaboration.members.find((member) => member.userId === assigneeId);
+    setCollaborationAction(`assignment:${requirement.id}`);
+    setMessage(null);
+    setError(null);
+
+    if (persistence) {
+      const { error: assignmentError } = await createClient().rpc("assign_product_requirement", {
+        p_product_requirement_id: requirement.id,
+        p_assignee_id: assigneeId,
+        p_due_date: dueDate,
+      });
+      if (assignmentError) {
+        setError(`L’affectation n’a pas pu être enregistrée : ${assignmentError.message}`);
+        setCollaborationAction(undefined);
+        return;
+      }
+    }
+
+    setLocalRequirements((current) => current.map((item) => item.id === requirement.id ? {
+      ...item,
+      assigneeId: assigneeId ?? undefined,
+      owner: assignee?.fullName,
+      dueDate: dueDate ? formatLocalDate(dueDate) : undefined,
+      dueDateValue: dueDate ?? undefined,
+    } : item));
+    setMessage("Responsabilité et échéance enregistrées.");
+    setCollaborationAction(undefined);
+    if (persistence) router.refresh();
+  }
+
+  async function addComment(requirement: Requirement) {
+    const body = commentDrafts[requirement.id]?.trim();
+    if (!body) return;
+    setCollaborationAction(`comment:${requirement.id}`);
+    setMessage(null);
+    setError(null);
+
+    let persistedId = `demo-comment-${Date.now()}`;
+    if (persistence) {
+      const { data, error: commentError } = await createClient().rpc("add_requirement_comment", {
+        p_product_requirement_id: requirement.id,
+        p_body: body,
+      });
+      if (commentError) {
+        setError(`Le commentaire n’a pas pu être ajouté : ${commentError.message}`);
+        setCollaborationAction(undefined);
+        return;
+      }
+      if (data && typeof data === "object" && !Array.isArray(data) && typeof data.id === "string") persistedId = data.id;
+    }
+
+    const comment: RequirementComment = {
+      id: persistedId,
+      body,
+      authorId: collaboration.currentUserId || "demo-current-user",
+      authorName: collaboration.currentUserName,
+      authorInitials: collaboration.currentUserInitials,
+      createdAt: "À l’instant",
+    };
+    setLocalRequirements((current) => current.map((item) => item.id === requirement.id
+      ? { ...item, comments: [...(item.comments ?? []), comment] }
+      : item));
+    setCommentDrafts((current) => ({ ...current, [requirement.id]: "" }));
+    setMessage("Commentaire ajouté au journal de l’exigence.");
+    setCollaborationAction(undefined);
+    if (persistence) router.refresh();
   }
 
   return (
@@ -152,6 +246,77 @@ export function RequirementChecklist({ requirements, documents, persistence }: R
                       {requirement.effectiveFrom ? <span>Applicable depuis <strong>{requirement.effectiveFrom}</strong></span> : null}
                       {requirement.lastUpdated ? <span>Référentiel vérifié le <strong>{requirement.lastUpdated}</strong></span> : null}
                     </div>
+                  </div>
+                  <div className="requirement-collaboration">
+                    <div className="collaboration-heading">
+                      <span><UserRoundCheck size={16} /></span>
+                      <div><strong>Responsabilité et échanges</strong><small>{requirement.comments?.length ?? 0} commentaire{(requirement.comments?.length ?? 0) > 1 ? "s" : ""}</small></div>
+                    </div>
+
+                    {collaboration.canAssign ? (
+                      <div className="assignment-controls">
+                        <label>
+                          <span>Responsable</span>
+                          <select
+                            value={assignees[requirement.id] ?? ""}
+                            disabled={collaborationAction === `assignment:${requirement.id}`}
+                            onChange={(event) => setAssignees((current) => ({ ...current, [requirement.id]: event.target.value }))}
+                          >
+                            <option value="">Non assigné</option>
+                            {activeMembers.map((member) => <option key={member.userId} value={member.userId}>{member.fullName}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          <span><CalendarClock size={12} />Échéance interne</span>
+                          <input
+                            type="date"
+                            value={dueDates[requirement.id] ?? ""}
+                            disabled={collaborationAction === `assignment:${requirement.id}`}
+                            onChange={(event) => setDueDates((current) => ({ ...current, [requirement.id]: event.target.value }))}
+                          />
+                        </label>
+                        <button
+                          className="button button-secondary button-small"
+                          type="button"
+                          disabled={collaborationAction === `assignment:${requirement.id}`}
+                          onClick={() => void saveAssignment(requirement)}
+                        >
+                          <Save size={14} />{collaborationAction === `assignment:${requirement.id}` ? "Enregistrement…" : "Enregistrer"}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    <div className="requirement-comments">
+                      {(requirement.comments ?? []).length ? requirement.comments?.map((comment) => (
+                        <article className="requirement-comment" key={comment.id}>
+                          <span className="avatar comment-avatar">{comment.authorInitials}</span>
+                          <div><strong>{comment.authorName}</strong><p>{comment.body}</p><small>{comment.createdAt}</small></div>
+                        </article>
+                      )) : <div className="comments-empty"><MessageSquareText size={16} /><span>Aucun échange pour cette exigence.</span></div>}
+                    </div>
+
+                    {collaboration.canComment ? (
+                      <div className="comment-composer">
+                        <label className="sr-only" htmlFor={`comment-${requirement.id}`}>Ajouter un commentaire</label>
+                        <textarea
+                          id={`comment-${requirement.id}`}
+                          rows={2}
+                          maxLength={2000}
+                          value={commentDrafts[requirement.id] ?? ""}
+                          placeholder="Ajouter une précision, une demande ou une décision…"
+                          disabled={collaborationAction === `comment:${requirement.id}`}
+                          onChange={(event) => setCommentDrafts((current) => ({ ...current, [requirement.id]: event.target.value }))}
+                        />
+                        <button
+                          className="button button-dark button-small"
+                          type="button"
+                          disabled={!commentDrafts[requirement.id]?.trim() || collaborationAction === `comment:${requirement.id}`}
+                          onClick={() => void addComment(requirement)}
+                        >
+                          <Send size={14} />{collaborationAction === `comment:${requirement.id}` ? "Envoi…" : "Commenter"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                   {requirement.evidenceDocumentName ? (
                     <p className="linked-evidence"><CheckCircle2 size={14} />Preuve liée : <strong>{requirement.evidenceDocumentName}</strong></p>

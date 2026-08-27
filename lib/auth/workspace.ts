@@ -27,6 +27,14 @@ export const demoWorkspace: WorkspaceContext = {
   organizationInitials: "ND",
 };
 
+const workspaceRoleCopy: Record<string, string> = {
+  owner: "Propriétaire",
+  admin: "Administrateur",
+  editor: "Contributeur",
+  reviewer: "Vérificateur",
+  viewer: "Lecture seule",
+};
+
 function initials(value: string) {
   return value
     .split(/\s+/)
@@ -47,7 +55,7 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
     supabase.from("profiles").select("full_name, job_title").eq("id", user.id).maybeSingle(),
     supabase
       .from("organization_members")
-      .select("org_id, role, organizations!inner(id, name, slug, country_code)")
+      .select("org_id, role, accepted_at, organizations!inner(id, name, slug, country_code)")
       .eq("user_id", user.id)
       .limit(1)
       .maybeSingle(),
@@ -69,6 +77,7 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
   }
 
   const organization = membership.organizations;
+  if (!membership.accepted_at) await supabase.rpc("accept_my_organization_invitations");
   return {
     mode: "authenticated",
     userId: user.id,
@@ -76,7 +85,7 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
     userName,
     userInitials: initials(userName),
     jobTitle: profile?.job_title ?? undefined,
-    role: membership.role === "owner" ? "Propriétaire" : membership.role,
+    role: workspaceRoleCopy[membership.role] ?? membership.role,
     organizationId: organization.id,
     organizationName: organization.name,
     organizationInitials: initials(organization.name),

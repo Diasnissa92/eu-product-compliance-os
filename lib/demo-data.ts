@@ -37,7 +37,20 @@ const lumaRequirements: Requirement[] = [
     lastUpdated: "19 août 2026",
     status: "verified",
     severity: "blocking",
+    assigneeId: "demo-sofia",
     owner: "Sofia Martin",
+    dueDate: "12 sept. 2026",
+    dueDateValue: "2026-09-12",
+    comments: [
+      {
+        id: "demo-comment-1",
+        body: "Marquage contrôlé sur le produit et sur l’emballage. La photo de détail est jointe au dossier.",
+        authorId: "demo-sofia",
+        authorName: "Sofia Martin",
+        authorInitials: "SM",
+        createdAt: "26 août 2026",
+      },
+    ],
   },
   {
     id: "req-doc",
@@ -50,7 +63,10 @@ const lumaRequirements: Requirement[] = [
     lastUpdated: "19 août 2026",
     status: "verified",
     severity: "blocking",
+    assigneeId: "demo-sofia",
     owner: "Sofia Martin",
+    dueDate: "18 sept. 2026",
+    dueDateValue: "2026-09-18",
   },
   {
     id: "req-emc",

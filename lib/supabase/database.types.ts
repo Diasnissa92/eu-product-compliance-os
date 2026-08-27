@@ -123,19 +123,28 @@ export type Database = {
       }
       organization_members: {
         Row: {
+          accepted_at: string | null
           created_at: string
+          invited_by: string | null
+          invited_email: string | null
           org_id: string
           role: string
           user_id: string
         }
         Insert: {
+          accepted_at?: string | null
           created_at?: string
+          invited_by?: string | null
+          invited_email?: string | null
           org_id: string
           role: string
           user_id: string
         }
         Update: {
+          accepted_at?: string | null
           created_at?: string
+          invited_by?: string | null
+          invited_email?: string | null
           org_id?: string
           role?: string
           user_id?: string
@@ -182,8 +191,10 @@ export type Database = {
       }
       product_requirements: {
         Row: {
+          assigned_to: string | null
           checked_by: string | null
           created_at: string
+          due_date: string | null
           evidence_document_id: string | null
           id: string
           last_checked_at: string | null
@@ -195,8 +206,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           checked_by?: string | null
           created_at?: string
+          due_date?: string | null
           evidence_document_id?: string | null
           id?: string
           last_checked_at?: string | null
@@ -208,8 +221,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           checked_by?: string | null
           created_at?: string
+          due_date?: string | null
           evidence_document_id?: string | null
           id?: string
           last_checked_at?: string | null
@@ -247,6 +262,61 @@ export type Database = {
             columns: ["requirement_id"]
             isOneToOne: false
             referencedRelation: "requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      requirement_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+          org_id: string
+          product_id: string
+          product_requirement_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          id?: string
+          org_id: string
+          product_id: string
+          product_requirement_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          product_id?: string
+          product_requirement_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requirement_comments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirement_comments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requirement_comments_product_requirement_id_fkey"
+            columns: ["product_requirement_id"]
+            isOneToOne: false
+            referencedRelation: "product_requirements"
             referencedColumns: ["id"]
           },
         ]
@@ -455,12 +525,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_requirement_comment: {
+        Args: { p_body: string; p_product_requirement_id: string }
+        Returns: Json
+      }
+      accept_my_organization_invitations: { Args: never; Returns: number }
+      assign_product_requirement: {
+        Args: {
+          p_assignee_id: string | null
+          p_due_date: string | null
+          p_product_requirement_id: string
+        }
+        Returns: Json
+      }
       review_product_requirement: {
         Args: {
           p_decision: string
           p_document_id: string
           p_product_requirement_id: string
         }
+        Returns: Json
+      }
+      update_organization_member_role: {
+        Args: { p_org_id: string; p_role: string; p_user_id: string }
         Returns: Json
       }
     }
