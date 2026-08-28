@@ -4,6 +4,7 @@ import type { WorkspaceContext } from "@/lib/auth/workspace";
 import { products as demoProducts } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
+import { mapStoredDocumentAnalysis, mimeTypeFromFileName } from "@/lib/document-analysis";
 import type { PortfolioDocument, ProductDocument } from "@/lib/types";
 import { cache } from "react";
 
@@ -24,6 +25,13 @@ function documentSize(metadata: DocumentRow["metadata"]) {
       : `${Math.max(1, Math.ceil(metadata.size / 1000))} Ko`;
   }
   return "Fichier sécurisé";
+}
+
+function documentMimeType(metadata: DocumentRow["metadata"], fileName: string) {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && typeof metadata.mime_type === "string") {
+    return metadata.mime_type;
+  }
+  return mimeTypeFromFileName(fileName);
 }
 
 function hasExpired(expiryDate: string | null) {
@@ -49,19 +57,32 @@ function demoDocuments(): PortfolioDocument[] {
       productSku: product.sku,
       productCategory: product.category,
       createdAt: new Date(2026, 7, Math.max(1, 18 - index)).toISOString(),
+      mimeType: mimeTypeFromFileName(document.name),
     })),
   );
 }
 
 const getAuthenticatedDocuments = cache(async (organizationId: string): Promise<PortfolioDocument[]> => {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*, product:products!documents_product_id_fkey(id, name, sku, category)")
-    .eq("org_id", organizationId)
-    .order("created_at", { ascending: false });
+  const [{ data, error }, { data: analysisRows }] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("*, product:products!documents_product_id_fkey(id, name, sku, category)")
+      .eq("org_id", organizationId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("document_analyses")
+      .select("*")
+      .eq("org_id", organizationId)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (error) throw new Error(`Impossible de charger les documents : ${error.message}`);
+
+  const latestAnalysisByDocument = new Map<string, ReturnType<typeof mapStoredDocumentAnalysis>>();
+  for (const row of analysisRows ?? []) {
+    if (!latestAnalysisByDocument.has(row.document_id)) latestAnalysisByDocument.set(row.document_id, mapStoredDocumentAnalysis(row));
+  }
 
   return (data ?? []).flatMap((row) => {
     if (!row.product) return [];
@@ -74,6 +95,8 @@ const getAuthenticatedDocuments = cache(async (organizationId: string): Promise<
       expiresAt: row.expiry_date ? formatDate(row.expiry_date) : undefined,
       size: documentSize(row.metadata),
       filePath: row.file_path ?? undefined,
+      mimeType: documentMimeType(row.metadata, row.title),
+      analysis: latestAnalysisByDocument.get(row.id),
       organizationId: row.org_id,
       productId: row.product.id,
       productName: row.product.name,

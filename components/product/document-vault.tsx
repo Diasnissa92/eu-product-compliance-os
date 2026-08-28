@@ -3,6 +3,7 @@
 import { AlertCircle, CheckCircle2, Download, File, FileSearch, Plus, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { DocumentAnalysisAction } from "@/components/document/document-analysis-action";
 import { createClient } from "@/lib/supabase/client";
 import type { PersistenceContext, ProductDocument } from "@/lib/types";
 
@@ -45,7 +46,17 @@ function safeFileName(fileName: string) {
     .replace(/^-|-$/g, "") || "document";
 }
 
-export function DocumentVault({ documents, persistence }: { documents: ProductDocument[]; persistence?: PersistenceContext }) {
+export function DocumentVault({
+  documents,
+  persistence,
+  canAnalyze = true,
+  canApply = true,
+}: {
+  documents: ProductDocument[];
+  persistence?: PersistenceContext;
+  canAnalyze?: boolean;
+  canApply?: boolean;
+}) {
   const router = useRouter();
   const [localDocuments, setLocalDocuments] = useState(documents);
   const [message, setMessage] = useState<string | null>(null);
@@ -56,6 +67,10 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
 
   async function handleFile(file?: File) {
     if (!file) return;
+    if (!canApply) {
+      setError("Votre rôle ne permet pas d’ajouter ou de modifier des documents.");
+      return;
+    }
     setMessage(null);
     setError(null);
 
@@ -79,6 +94,7 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
           status: "review",
           uploadedAt: "À l’instant",
           size: displaySize(file.size),
+          mimeType: contentType,
         },
         ...current,
       ]);
@@ -146,6 +162,7 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
         uploadedAt: "À l’instant",
         size: displaySize(file.size),
         filePath,
+        mimeType: contentType,
       },
       ...current,
     ]);
@@ -185,12 +202,12 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
         ref={inputRef}
         type="file"
         accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"
-        disabled={uploading}
+        disabled={uploading || !canApply}
         onChange={(event) => void handleFile(event.target.files?.[0])}
       />
       <div className="document-toolbar">
         <div><strong>{localDocuments.length} documents</strong><span> · {localDocuments.filter((doc) => doc.status === "verified").length} vérifiés</span></div>
-        <button className="button button-primary button-small" type="button" disabled={uploading} onClick={() => inputRef.current?.click()}>
+        <button className="button button-primary button-small" type="button" disabled={uploading || !canApply} onClick={() => inputRef.current?.click()}>
           <Upload size={16} />{uploading ? "Envoi…" : "Ajouter une preuve"}
         </button>
       </div>
@@ -219,6 +236,13 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
                     ? "Refusé"
                     : "Expiré"}
             </span>
+            <DocumentAnalysisAction
+              document={document}
+              persistence={persistence}
+              canAnalyze={canAnalyze}
+              canApply={canApply}
+              onUpdated={(updated) => setLocalDocuments((current) => current.map((item) => item.id === updated.id ? updated : item))}
+            />
             {document.filePath ? (
               <button className="icon-button" type="button" disabled={downloadingId === document.id} onClick={() => void downloadDocument(document)} aria-label={`Télécharger ${document.name}`}>
                 <Download size={18} />
@@ -231,7 +255,7 @@ export function DocumentVault({ documents, persistence }: { documents: ProductDo
       <button
         className="document-dropzone"
         type="button"
-        disabled={uploading}
+        disabled={uploading || !canApply}
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
