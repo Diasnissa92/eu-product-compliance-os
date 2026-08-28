@@ -55,6 +55,82 @@ export type Database = {
           },
         ]
       }
+      document_analyses: {
+        Row: {
+          applied_at: string | null
+          completed_at: string | null
+          created_at: string
+          document_id: string
+          error_message: string | null
+          estimated_cost_usd: number | null
+          id: string
+          model: string
+          org_id: string
+          product_id: string
+          prompt_version: string
+          requested_by: string
+          result: Json | null
+          status: string
+          token_usage: Json
+        }
+        Insert: {
+          applied_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          document_id: string
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          id?: string
+          model: string
+          org_id: string
+          product_id: string
+          prompt_version: string
+          requested_by: string
+          result?: Json | null
+          status?: string
+          token_usage?: Json
+        }
+        Update: {
+          applied_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          document_id?: string
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          id?: string
+          model?: string
+          org_id?: string
+          product_id?: string
+          prompt_version?: string
+          requested_by?: string
+          result?: Json | null
+          status?: string
+          token_usage?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_analyses_document_scope_fkey"
+            columns: ["document_id", "org_id", "product_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id", "org_id", "product_id"]
+          },
+          {
+            foreignKeyName: "document_analyses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_analyses_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           created_at: string
@@ -525,6 +601,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_document_analysis: {
+        Args: { p_analysis_id: string }
+        Returns: Json
+      }
       add_requirement_comment: {
         Args: { p_body: string; p_product_requirement_id: string }
         Returns: Json

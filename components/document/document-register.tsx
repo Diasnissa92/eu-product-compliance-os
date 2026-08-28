@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
+import { DocumentAnalysisAction } from "@/components/document/document-analysis-action";
 import { DocumentMetadataDialog } from "@/components/document/document-metadata-dialog";
 import { createClient } from "@/lib/supabase/client";
 import type { PortfolioDocument, ProductDocument } from "@/lib/types";
@@ -49,7 +50,17 @@ function expiryState(document: PortfolioDocument) {
   return { label: document.expiresAt ?? "Date renseignée", tone: "safe" };
 }
 
-export function DocumentRegister({ documents, initialEditId }: { documents: PortfolioDocument[]; initialEditId?: string }) {
+export function DocumentRegister({
+  documents,
+  initialEditId,
+  canAnalyze = true,
+  canApply = true,
+}: {
+  documents: PortfolioDocument[];
+  initialEditId?: string;
+  canAnalyze?: boolean;
+  canApply?: boolean;
+}) {
   const router = useRouter();
   const [localDocuments, setLocalDocuments] = useState(documents);
   const [query, setQuery] = useState("");
@@ -215,6 +226,7 @@ export function DocumentRegister({ documents, initialEditId }: { documents: Port
                   <td>
                     <span className="document-row-actions">
                       <button
+                        hidden={!canApply}
                         className="icon-button"
                         type="button"
                         onClick={() => {
@@ -225,6 +237,13 @@ export function DocumentRegister({ documents, initialEditId }: { documents: Port
                       >
                         <Pencil size={16} />
                       </button>
+                      <DocumentAnalysisAction
+                        document={document}
+                        persistence={document.organizationId ? { organizationId: document.organizationId, productId: document.productId } : undefined}
+                        canAnalyze={canAnalyze}
+                        canApply={canApply}
+                        onUpdated={(updated) => setLocalDocuments((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item))}
+                      />
                       {document.filePath ? (
                         <button
                           className="icon-button"

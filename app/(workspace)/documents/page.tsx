@@ -12,6 +12,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const workspace = await getWorkspaceContext();
   const documents = await getWorkspaceDocuments(workspace);
   const stats = getDocumentStats(documents);
+  const canAnalyze = !["Lecture seule", "viewer"].includes(workspace.role);
+  const canApply = ["Propriétaire", "Administrateur", "Contributeur", "owner", "admin", "editor"].includes(workspace.role);
 
   return (
     <main>
@@ -35,7 +37,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
       <section className="panel documents-panel">
         {documents.length ? (
-          <DocumentRegister documents={documents} initialEditId={edit} />
+          <DocumentRegister documents={documents} initialEditId={edit} canAnalyze={canAnalyze} canApply={canApply} />
         ) : (
           <div className="empty-state">
             <Files size={28} />

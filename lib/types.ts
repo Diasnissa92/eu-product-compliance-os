@@ -23,6 +23,46 @@ export type RequirementComment = {
   createdAt: string;
 };
 
+export type DocumentEvidenceQuality = "strong" | "partial" | "weak";
+export type DocumentAnalysisStatus = "pending" | "completed" | "failed" | "applied";
+
+export type DocumentRequirementMatch = {
+  productRequirementId: string;
+  title: string;
+  reason: string;
+  confidence: number;
+};
+
+export type DocumentAnalysisResult = {
+  documentType: string;
+  suggestedTitle: string | null;
+  manufacturerName: string | null;
+  productReference: string | null;
+  issuingBody: string | null;
+  issueDate: string | null;
+  expiryDate: string | null;
+  standards: string[];
+  regulationReferences: string[];
+  languageCodes: string[];
+  confidence: number;
+  evidenceQuality: DocumentEvidenceQuality;
+  summary: string;
+  warnings: string[];
+  requirementMatches: DocumentRequirementMatch[];
+};
+
+export type DocumentAnalysis = {
+  id: string;
+  status: DocumentAnalysisStatus;
+  model: string;
+  result?: DocumentAnalysisResult;
+  errorMessage?: string;
+  estimatedCostUsd?: number;
+  createdAt: string;
+  completedAt?: string;
+  appliedAt?: string;
+};
+
 export type Requirement = {
   id: string;
   title: string;
@@ -54,6 +94,8 @@ export type ProductDocument = {
   expiresAt?: string;
   size: string;
   filePath?: string;
+  mimeType?: string;
+  analysis?: DocumentAnalysis;
 };
 
 export type PortfolioDocument = ProductDocument & {

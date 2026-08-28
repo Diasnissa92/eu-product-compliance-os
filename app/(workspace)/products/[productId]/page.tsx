@@ -40,6 +40,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const persistence = workspace.mode === "authenticated" && workspace.organizationId
     ? { organizationId: workspace.organizationId, productId: product.id }
     : undefined;
+  const canAnalyzeDocuments = !["Lecture seule", "viewer"].includes(workspace.role);
+  const canApplyDocumentAnalysis = ["Propriétaire", "Administrateur", "Contributeur", "owner", "admin", "editor"].includes(workspace.role);
 
   return (
     <main>
@@ -106,9 +108,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <section className="panel detail-section" id="documents">
             <div className="panel-heading"><div><span className="eyebrow">Coffre de preuves</span><h2>Documents réglementaires</h2></div></div>
             <DocumentVault
-              key={product.documents.map((document) => `${document.id}:${document.status}`).join("|")}
+              key={product.documents.map((document) => `${document.id}:${document.status}:${document.analysis?.status ?? "none"}`).join("|")}
               documents={product.documents}
               persistence={persistence}
+              canAnalyze={canAnalyzeDocuments}
+              canApply={canApplyDocumentAnalysis}
             />
           </section>
 

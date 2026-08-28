@@ -5,6 +5,7 @@ import type { WorkspaceContext } from "@/lib/auth/workspace";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
 import { personInitials } from "@/lib/team";
+import { mapStoredDocumentAnalysis, mimeTypeFromFileName } from "@/lib/document-analysis";
 import type { AuditEvent, ComplianceStatus, Product, ProductDocument, Requirement, RequirementComment, RequirementSeverity, RequirementStatus } from "@/lib/types";
 
 type ProductRow = Tables<"products">;
@@ -73,6 +74,13 @@ function documentSize(metadata: Tables<"documents">["metadata"]) {
   return "Fichier sécurisé";
 }
 
+function documentMimeType(metadata: Tables<"documents">["metadata"], fileName: string) {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && typeof metadata.mime_type === "string") {
+    return metadata.mime_type;
+  }
+  return mimeTypeFromFileName(fileName);
+}
+
 export async function getWorkspaceProducts(workspace: WorkspaceContext) {
   if (workspace.mode !== "authenticated" || !workspace.organizationId) return demoProducts;
 
@@ -101,7 +109,7 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
 
   if (error || !productRow) return undefined;
 
-  const [{ data: requirementRows }, { data: documentRows }, { data: auditRows }, { data: commentRows }] = await Promise.all([
+  const [{ data: requirementRows }, { data: documentRows }, { data: auditRows }, { data: commentRows }, { data: analysisRows }] = await Promise.all([
     supabase
       .from("product_requirements")
       .select("id, status, notes, last_checked_at, evidence_document_id, assigned_to, due_date, requirements!inner(id, title, description, requirement_type, mandatory, source_reference, effective_from, updated_at, regulations!inner(code, title, source_url, effective_from, updated_at))")
@@ -111,6 +119,7 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     supabase.from("documents").select("*").eq("org_id", workspace.organizationId).eq("product_id", productId).order("created_at", { ascending: false }),
     supabase.from("audit_events").select("*").eq("org_id", workspace.organizationId).eq("entity_id", productId).order("created_at", { ascending: false }),
     supabase.from("requirement_comments").select("id, product_requirement_id, author_id, body, created_at").eq("org_id", workspace.organizationId).eq("product_id", productId).order("created_at"),
+    supabase.from("document_analyses").select("*").eq("org_id", workspace.organizationId).eq("product_id", productId).order("created_at", { ascending: false }),
   ]);
 
   const profileIds = [...new Set([
@@ -135,6 +144,11 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     commentsByRequirement.set(comment.product_requirement_id, [...(commentsByRequirement.get(comment.product_requirement_id) ?? []), mappedComment]);
   }
 
+  const latestAnalysisByDocument = new Map<string, ReturnType<typeof mapStoredDocumentAnalysis>>();
+  for (const row of analysisRows ?? []) {
+    if (!latestAnalysisByDocument.has(row.document_id)) latestAnalysisByDocument.set(row.document_id, mapStoredDocumentAnalysis(row));
+  }
+
   const documents: ProductDocument[] = (documentRows ?? []).map((row) => ({
     id: row.id,
     name: row.title,
@@ -144,6 +158,8 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     expiresAt: row.expiry_date ? formatDate(row.expiry_date) : undefined,
     size: documentSize(row.metadata),
     filePath: row.file_path ?? undefined,
+    mimeType: documentMimeType(row.metadata, row.title),
+    analysis: latestAnalysisByDocument.get(row.id),
   }));
 
   const documentNames = new Map(documents.map((document) => [document.id, document.name]));

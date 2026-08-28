@@ -114,6 +114,7 @@ const lumaDocuments: ProductDocument[] = [
     status: "verified",
     uploadedAt: "17 août 2026",
     size: "1,8 Mo",
+    mimeType: "application/pdf",
   },
   {
     id: "doc-2",
@@ -123,6 +124,7 @@ const lumaDocuments: ProductDocument[] = [
     uploadedAt: "15 août 2026",
     expiresAt: "15 août 2029",
     size: "4,2 Mo",
+    mimeType: "application/pdf",
   },
   {
     id: "doc-3",
@@ -131,6 +133,7 @@ const lumaDocuments: ProductDocument[] = [
     status: "verified",
     uploadedAt: "14 août 2026",
     size: "2,4 Mo",
+    mimeType: "application/pdf",
   },
   {
     id: "doc-4",
@@ -140,6 +143,7 @@ const lumaDocuments: ProductDocument[] = [
     uploadedAt: "12 août 2026",
     expiresAt: "12 février 2027",
     size: "840 Ko",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   },
 ];
 
