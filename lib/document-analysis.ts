@@ -1,7 +1,7 @@
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import type { DocumentAnalysis, DocumentAnalysisResult, ProductDocument } from "@/lib/types";
 
-export const DOCUMENT_ANALYSIS_MODEL = "openai/gpt-5.6-luna";
+export const DOCUMENT_ANALYSIS_MODEL = "minimax/minimax-m3";
 export const DOCUMENT_ANALYSIS_PROMPT_VERSION = "document-intelligence-v1";
 
 export const analyzableMimeTypes = new Set([
@@ -37,7 +37,7 @@ export function safeAnalysisDate(value: string | null) {
 }
 
 export function estimateAnalysisCostUsd(inputTokens = 0, outputTokens = 0) {
-  const inputCost = inputTokens * 0.0000002;
+  const inputCost = inputTokens * 0.0000003;
   const outputCost = outputTokens * 0.0000012;
   return Number((inputCost + outputCost).toFixed(6));
 }

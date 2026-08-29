@@ -54,7 +54,7 @@ describe("document intelligence", () => {
   });
 
   it("estimates the configured model cost", () => {
-    expect(estimateAnalysisCostUsd(10_000, 2_000)).toBe(0.0044);
+    expect(estimateAnalysisCostUsd(10_000, 2_000)).toBe(0.0054);
   });
 
   it("rejects a stored result with malformed requirement matches", () => {
