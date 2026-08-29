@@ -2,6 +2,7 @@
 
 import { Check, Download, Printer, Share2 } from "lucide-react";
 import { useState } from "react";
+import { copyText, downloadBlob } from "@/lib/client-actions";
 import {
   createRegulatoryReportPdf,
   regulatoryReportPdfFilename,
@@ -10,28 +11,31 @@ import {
 
 export function RegulatoryReportActions({ report }: { report: RegulatoryReportPdfData }) {
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<string>();
 
   async function copySecureLink() {
-    await navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    setFeedback(undefined);
+    try {
+      await copyText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setFeedback("Le lien n’a pas pu être copié. Copiez l’adresse affichée par votre navigateur.");
+    }
   }
 
   function downloadPdf() {
-    const file = createRegulatoryReportPdf(report);
-    const fileUrl = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = fileUrl;
-    link.download = regulatoryReportPdfFilename(report.productName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
+    setFeedback(undefined);
+    try {
+      downloadBlob(createRegulatoryReportPdf(report), regulatoryReportPdfFilename(report.productName));
+    } catch {
+      setFeedback("Le PDF n’a pas pu être généré. Réessayez ou utilisez le bouton Imprimer.");
+    }
   }
 
   return (
     <div className="report-actions">
-      <button className="button button-secondary" type="button" onClick={copySecureLink}>
+      <button className="button button-secondary" type="button" onClick={() => void copySecureLink()}>
         {copied ? <Check size={17} /> : <Share2 size={17} />}
         {copied ? "Lien copié" : "Copier le lien sécurisé"}
       </button>
@@ -42,7 +46,7 @@ export function RegulatoryReportActions({ report }: { report: RegulatoryReportPd
         <Download size={17} />Télécharger le PDF
       </button>
       <span className="sr-only" aria-live="polite">
-        {copied ? `Le lien de la fiche ${report.productName} a été copié.` : ""}
+        {feedback || (copied ? `Le lien de la fiche ${report.productName} a été copié.` : "")}
       </span>
     </div>
   );

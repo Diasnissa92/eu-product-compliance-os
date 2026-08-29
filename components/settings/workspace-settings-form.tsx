@@ -47,53 +47,42 @@ export function WorkspaceSettingsForm({ values }: { values: SettingsValues }) {
     }
 
     setPending(true);
-    const supabase = createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user || user.id !== values.userId) {
-      setError("Votre session a expiré. Reconnectez-vous.");
-      setPending(false);
-      return;
-    }
-
-    const { error: profileError } = await supabase.from("profiles").upsert({
-      id: user.id,
-      full_name: fullName.trim(),
-      job_title: jobTitle.trim() || null,
-      updated_at: new Date().toISOString(),
-    });
-    if (profileError) {
-      setError(`Le profil n’a pas pu être mis à jour : ${profileError.message}`);
-      setPending(false);
-      return;
-    }
-
-    if (values.canManageOrganization && values.organizationId) {
-      const { data: organization, error: organizationError } = await supabase
-        .from("organizations")
-        .update({ name: organizationName.trim(), country_code: countryCode, updated_at: new Date().toISOString() })
-        .eq("id", values.organizationId)
-        .select("id")
-        .single();
-      if (organizationError || !organization) {
-        setError(`Le profil est enregistré, mais pas l’organisation : ${organizationError?.message ?? "accès refusé"}`);
-        setPending(false);
-        router.refresh();
-        return;
-      }
-
-      await supabase.from("audit_events").insert({
-        org_id: values.organizationId,
-        user_id: user.id,
-        entity_type: "organization",
-        entity_id: values.organizationId,
-        action: "Paramètres de l’organisation mis à jour",
-        payload: { country_code: countryCode },
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user || user.id !== values.userId) throw new Error("Votre session a expiré. Reconnectez-vous.");
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: user.id,
+        full_name: fullName.trim(),
+        job_title: jobTitle.trim() || null,
+        updated_at: new Date().toISOString(),
       });
-    }
+      if (profileError) throw new Error(`Le profil n’a pas pu être mis à jour : ${profileError.message}`);
 
-    setMessage("Les paramètres ont été enregistrés.");
-    setPending(false);
-    router.refresh();
+      if (values.canManageOrganization && values.organizationId) {
+        const { data: organization, error: organizationError } = await supabase
+          .from("organizations")
+          .update({ name: organizationName.trim(), country_code: countryCode, updated_at: new Date().toISOString() })
+          .eq("id", values.organizationId)
+          .select("id")
+          .single();
+        if (organizationError || !organization) throw new Error(`Le profil est enregistré, mais pas l’organisation : ${organizationError?.message ?? "accès refusé"}`);
+        await supabase.from("audit_events").insert({
+          org_id: values.organizationId,
+          user_id: user.id,
+          entity_type: "organization",
+          entity_id: values.organizationId,
+          action: "Paramètres de l’organisation mis à jour",
+          payload: { country_code: countryCode },
+        });
+      }
+      setMessage("Les paramètres ont été enregistrés.");
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Les paramètres n’ont pas pu être enregistrés.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (

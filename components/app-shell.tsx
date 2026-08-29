@@ -15,9 +15,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { BrandMark } from "@/components/brand-mark";
+import { useModalDialog } from "@/components/ui/use-modal-dialog";
 import type { WorkspaceContext } from "@/lib/auth/workspace";
 
 const navigation = [
@@ -71,7 +72,7 @@ function SidebarContent({ close, workspace }: { close?: () => void; workspace: W
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
           return (
-            <Link className={`nav-item ${active ? "nav-item-active" : ""}`} href={item.href} key={item.href} onClick={close}>
+            <Link className={`nav-item ${active ? "nav-item-active" : ""}`} href={item.href} key={item.href} onClick={close} aria-current={active ? "page" : undefined}>
               <Icon size={19} />
               {item.label}
             </Link>
@@ -119,21 +120,24 @@ export function AppShell({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const closeMobile = useCallback(() => setMobileOpen(false), []);
+  const { dialogRef, triggerRef } = useModalDialog({ open: mobileOpen, onClose: closeMobile });
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Aller au contenu principal</a>
       <aside className="sidebar"><SidebarContent workspace={workspace} /></aside>
 
       {mobileOpen ? (
         <div className="mobile-navigation" role="dialog" aria-modal="true" aria-label="Menu principal">
-          <button className="mobile-backdrop" onClick={() => setMobileOpen(false)} aria-label="Fermer le menu" />
-          <aside className="mobile-sidebar"><SidebarContent close={() => setMobileOpen(false)} workspace={workspace} /></aside>
+          <button className="mobile-backdrop" onClick={closeMobile} aria-label="Fermer le menu" />
+          <aside className="mobile-sidebar" ref={dialogRef} tabIndex={-1}><SidebarContent close={closeMobile} workspace={workspace} /></aside>
         </div>
       ) : null}
 
       <div className="workspace">
         <header className="topbar">
-          <button className="icon-button mobile-menu" type="button" onClick={() => setMobileOpen(true)} aria-label="Ouvrir le menu">
+          <button ref={triggerRef} className="icon-button mobile-menu" type="button" onClick={() => setMobileOpen(true)} aria-label="Ouvrir le menu" aria-expanded={mobileOpen}>
             <Menu size={20} />
           </button>
           <div className="topbar-context">
@@ -153,7 +157,7 @@ export function AppShell({
             <span className="avatar avatar-small">{workspace.userInitials}</span>
           </div>
         </header>
-        <div className="workspace-content">{children}</div>
+        <div className="workspace-content" id="main-content" tabIndex={-1}>{children}</div>
       </div>
     </div>
   );

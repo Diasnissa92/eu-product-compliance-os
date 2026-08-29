@@ -2,7 +2,8 @@
 
 import { AlertCircle, Building2, Globe2, MapPin, PackageCheck, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
+import { useModalDialog } from "@/components/ui/use-modal-dialog";
 import { createClient } from "@/lib/supabase/client";
 import type { PersistenceContext, Product } from "@/lib/types";
 
@@ -18,15 +19,8 @@ export function ProductInformationEditor({ product, persistence }: { product: Pr
   const [destinationMarkets, setDestinationMarkets] = useState(product.destinationMarkets);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [open]);
+  const closeDialog = useCallback(() => setOpen(false), []);
+  const { dialogRef, triggerRef } = useModalDialog({ open, onClose: closeDialog, canClose: !pending });
 
   function toggleMarket(market: string) {
     setDestinationMarkets((current) => current.includes(market) ? current.filter((item) => item !== market) : [...current, market]);
@@ -41,61 +35,55 @@ export function ProductInformationEditor({ product, persistence }: { product: Pr
     }
 
     setPending(true);
-    const supabase = createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setError("Votre session a expiré. Reconnectez-vous.");
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Votre session a expiré. Reconnectez-vous.");
+      const normalizedSku = sku.trim();
+      if (normalizedSku) {
+        const { data: duplicate, error: duplicateError } = await supabase.from("products").select("id").eq("org_id", persistence.organizationId).eq("sku", normalizedSku).neq("id", persistence.productId).limit(1).maybeSingle();
+        if (duplicateError) throw duplicateError;
+        if (duplicate) throw new Error("Cette référence / SKU est déjà utilisée par un autre produit.");
+      }
+      const update = {
+        name: name.trim(),
+        sku: normalizedSku || null,
+        manufacturer_name: manufacturer.trim() || null,
+        origin_country: originCountry.trim() || null,
+        target_markets: destinationMarkets,
+        updated_at: new Date().toISOString(),
+      };
+      const { data: updatedProduct, error: updateError } = await supabase
+        .from("products").update(update).eq("id", persistence.productId).eq("org_id", persistence.organizationId).select("id").single();
+      if (updateError || !updatedProduct) throw new Error(`Le produit n’a pas pu être mis à jour : ${updateError?.message ?? "accès refusé"}`);
+      await supabase.from("audit_events").insert({
+        org_id: persistence.organizationId,
+        user_id: user.id,
+        entity_type: "product",
+        entity_id: persistence.productId,
+        action: "Informations produit mises à jour",
+        payload: { fields: Object.keys(update) },
+      });
+      closeDialog();
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Le produit n’a pas pu être mis à jour.");
+    } finally {
       setPending(false);
-      return;
     }
-
-    const update = {
-      name: name.trim(),
-      sku: sku.trim() || null,
-      manufacturer_name: manufacturer.trim() || null,
-      origin_country: originCountry.trim() || null,
-      target_markets: destinationMarkets,
-      updated_at: new Date().toISOString(),
-    };
-    const { data: updatedProduct, error: updateError } = await supabase
-      .from("products")
-      .update(update)
-      .eq("id", persistence.productId)
-      .eq("org_id", persistence.organizationId)
-      .select("id")
-      .single();
-
-    if (updateError || !updatedProduct) {
-      setError(`Le produit n’a pas pu être mis à jour : ${updateError?.message ?? "accès refusé"}`);
-      setPending(false);
-      return;
-    }
-
-    await supabase.from("audit_events").insert({
-      org_id: persistence.organizationId,
-      user_id: user.id,
-      entity_type: "product",
-      entity_id: persistence.productId,
-      action: "Informations produit mises à jour",
-      payload: { fields: Object.keys(update) },
-    });
-
-    setPending(false);
-    setOpen(false);
-    router.refresh();
   }
 
   return (
     <>
-      <button className="text-link" type="button" onClick={() => setOpen(true)}>Modifier</button>
+      <button ref={triggerRef} className="text-link" type="button" onClick={() => setOpen(true)}>Modifier</button>
       {open ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget && !pending) setOpen(false);
         }}>
-          <section className="metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="product-editor-title">
+          <section ref={dialogRef} tabIndex={-1} className="metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="product-editor-title">
             <div className="metadata-dialog-heading">
               <div><span className="eyebrow">Qualification</span><h2 id="product-editor-title">Modifier le produit</h2><p>La catégorie reste verrouillée pour préserver la checklist générée.</p></div>
-              <button className="icon-button" type="button" onClick={() => setOpen(false)} disabled={pending} aria-label="Fermer"><X size={19} /></button>
+              <button className="icon-button" type="button" onClick={closeDialog} disabled={pending} aria-label="Fermer"><X size={19} /></button>
             </div>
             <form className="metadata-form" onSubmit={submit}>
               <label className="field"><span><PackageCheck size={15} />Nom commercial</span><input value={name} onChange={(event) => setName(event.target.value)} required autoFocus /></label>
@@ -114,7 +102,7 @@ export function ProductInformationEditor({ product, persistence }: { product: Pr
               </fieldset>
               {error ? <div className="inline-message inline-message-error metadata-error" role="alert"><AlertCircle size={16} />{error}</div> : null}
               <div className="metadata-dialog-actions">
-                <button className="button button-secondary" type="button" onClick={() => setOpen(false)} disabled={pending}>Annuler</button>
+                <button className="button button-secondary" type="button" onClick={closeDialog} disabled={pending}>Annuler</button>
                 <button className="button button-primary" type="submit" disabled={pending}><Save size={16} />{pending ? "Enregistrement…" : "Enregistrer"}</button>
               </div>
             </form>

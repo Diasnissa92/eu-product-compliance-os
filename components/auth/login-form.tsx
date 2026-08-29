@@ -10,14 +10,14 @@ import { createClient } from "@/lib/supabase/client";
 
 type Mode = "sign-in" | "sign-up";
 
-export function LoginForm() {
+export function LoginForm({ initialError }: { initialError?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | undefined>(initialError);
   const [message, setMessage] = useState<string>();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -31,43 +31,37 @@ export function LoginForm() {
     }
 
     setPending(true);
-    const supabase = createClient();
-
-    if (mode === "sign-in") {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        setError(signInError.message === "Invalid login credentials" ? "Adresse e-mail ou mot de passe incorrect." : signInError.message);
-        setPending(false);
+    try {
+      const supabase = createClient();
+      if (mode === "sign-in") {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (signInError) throw signInError;
+        router.replace("/dashboard");
+        router.refresh();
         return;
       }
-      router.replace("/dashboard");
-      router.refresh();
-      return;
-    }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (signUpError) {
-      setError(signUpError.message);
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: fullName.trim() },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (signUpError) throw signUpError;
+      if (data.session) {
+        router.replace("/onboarding");
+        router.refresh();
+        return;
+      }
+      setMessage("Compte créé. Consultez votre boîte e-mail pour confirmer votre adresse.");
+    } catch (caughtError) {
+      const detail = caughtError instanceof Error ? caughtError.message : "Le service de connexion est momentanément indisponible.";
+      setError(detail === "Invalid login credentials" ? "Adresse e-mail ou mot de passe incorrect." : detail);
+    } finally {
       setPending(false);
-      return;
     }
-
-    if (data.session) {
-      router.replace("/onboarding");
-      router.refresh();
-      return;
-    }
-
-    setMessage("Compte créé. Consultez votre boîte e-mail pour confirmer votre adresse.");
-    setPending(false);
   }
 
   return (
@@ -90,6 +84,7 @@ export function LoginForm() {
         {mode === "sign-up" ? <label className="field"><span>Nom complet</span><input autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Hugo Dias" required /></label> : null}
         <label className="field"><span>Adresse e-mail</span><input autoComplete="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="vous@entreprise.fr" required /></label>
         <label className="field"><span>Mot de passe</span><input autoComplete={mode === "sign-in" ? "current-password" : "new-password"} type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8 caractères minimum" required /></label>
+        {mode === "sign-in" ? <Link className="auth-recovery-link" href="/forgot-password">Mot de passe oublié ?</Link> : null}
         {error ? <p className="form-feedback form-feedback-error" role="alert">{error}</p> : null}
         {message ? <p className="form-feedback form-feedback-success"><CheckCircle2 size={16} />{message}</p> : null}
         <button className="button button-primary button-full" type="submit" disabled={pending}>{pending ? "Chargement…" : mode === "sign-in" ? "Se connecter" : "Créer mon espace"}<ArrowRight size={17} /></button>

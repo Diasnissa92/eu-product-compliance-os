@@ -15,7 +15,9 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
+import { useModalDialog } from "@/components/ui/use-modal-dialog";
+import { timeoutSignal } from "@/lib/client-actions";
 import { demoDocumentAnalysis, isAnalyzableMimeType } from "@/lib/document-analysis";
 import { createClient } from "@/lib/supabase/client";
 import type { DocumentAnalysis, PersistenceContext, ProductDocument } from "@/lib/types";
@@ -64,6 +66,8 @@ export function DocumentAnalysisAction({
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string>();
   const [message, setMessage] = useState<string>();
+  const closeDialog = useCallback(() => setOpen(false), []);
+  const { dialogRef, triggerRef } = useModalDialog({ open, onClose: closeDialog, canClose: !loading && !applying });
 
   async function analyze(force = false) {
     setError(undefined);
@@ -77,22 +81,25 @@ export function DocumentAnalysisAction({
     }
 
     setLoading(true);
-    const response = await fetch(`/api/documents/${document.id}/analyze`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ force }),
-    });
-    const payload = await response.json().catch(() => ({})) as { analysis?: DocumentAnalysis; error?: string; detail?: string; reused?: boolean };
-    if (!response.ok || !payload.analysis) {
-      setError(payload.error || "L’analyse n’a pas pu être générée.");
+    try {
+      const response = await fetch(`/api/documents/${document.id}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+        signal: timeoutSignal(90_000),
+      });
+      const payload = await response.json().catch(() => ({})) as { analysis?: DocumentAnalysis; error?: string; detail?: string; reused?: boolean };
+      if (!response.ok || !payload.analysis) throw new Error(payload.error || "L’analyse n’a pas pu être générée.");
+      setAnalysis(payload.analysis);
+      onUpdated({ ...document, analysis: payload.analysis });
+      setMessage(payload.reused ? "Résultat existant réutilisé sans nouveau coût." : "Analyse terminée. Vérifiez les propositions avant de les appliquer.");
+    } catch (caughtError) {
+      setError(caughtError instanceof DOMException && caughtError.name === "TimeoutError"
+        ? "L’analyse a dépassé 90 secondes. Le document est conservé : vous pouvez relancer sans le téléverser à nouveau."
+        : caughtError instanceof Error ? caughtError.message : "L’analyse n’a pas pu être générée.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setAnalysis(payload.analysis);
-    onUpdated({ ...document, analysis: payload.analysis });
-    setMessage(payload.reused ? "Résultat existant réutilisé sans nouveau coût." : "Analyse terminée. Vérifiez les propositions avant de les appliquer.");
-    setLoading(false);
   }
 
   async function applyAnalysis() {
@@ -101,21 +108,21 @@ export function DocumentAnalysisAction({
     setError(undefined);
     setMessage(undefined);
 
-    if (persistence) {
-      const { error: applyError } = await createClient().rpc("apply_document_analysis", { p_analysis_id: analysis.id });
-      if (applyError) {
-        setError(`Les propositions n’ont pas pu être appliquées : ${applyError.message}`);
-        setApplying(false);
-        return;
+    try {
+      if (persistence) {
+        const { error: applyError } = await createClient().rpc("apply_document_analysis", { p_analysis_id: analysis.id });
+        if (applyError) throw new Error(`Les propositions n’ont pas pu être appliquées : ${applyError.message}`);
       }
+      const nextDocument = appliedDocument(document, analysis);
+      setAnalysis(nextDocument.analysis);
+      onUpdated(nextDocument);
+      setMessage("Informations confirmées et enregistrées dans le dossier.");
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Les propositions n’ont pas pu être appliquées.");
+    } finally {
+      setApplying(false);
     }
-
-    const nextDocument = appliedDocument(document, analysis);
-    setAnalysis(nextDocument.analysis);
-    onUpdated(nextDocument);
-    setMessage("Informations confirmées et enregistrées dans le dossier.");
-    setApplying(false);
-    router.refresh();
   }
 
   const triggerLabel = analysis?.status === "applied"
@@ -127,6 +134,7 @@ export function DocumentAnalysisAction({
   return (
     <>
       <button
+        ref={triggerRef}
         className={`icon-button analysis-trigger ${analysis?.result ? "analysis-trigger-ready" : ""}`}
         type="button"
         disabled={!supported && !analysis?.result}
@@ -141,7 +149,7 @@ export function DocumentAnalysisAction({
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget && !loading && !applying) setOpen(false);
         }}>
-          <section className="analysis-dialog" role="dialog" aria-modal="true" aria-labelledby="analysis-dialog-title">
+          <section ref={dialogRef} tabIndex={-1} className="analysis-dialog" role="dialog" aria-modal="true" aria-labelledby="analysis-dialog-title">
             <div className="analysis-dialog-heading">
               <div className="analysis-heading-icon"><BrainCircuit size={22} /></div>
               <div>
@@ -149,7 +157,7 @@ export function DocumentAnalysisAction({
                 <h2 id="analysis-dialog-title">Analyse intelligente du document</h2>
                 <p>{document.name}</p>
               </div>
-              <button className="icon-button" type="button" disabled={loading || applying} onClick={() => setOpen(false)} aria-label="Fermer">
+              <button className="icon-button" type="button" disabled={loading || applying} onClick={closeDialog} aria-label="Fermer">
                 <X size={19} />
               </button>
             </div>

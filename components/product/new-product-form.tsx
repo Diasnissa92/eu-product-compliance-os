@@ -22,8 +22,11 @@ export function NewProductForm({ persistence }: { persistence?: PersistenceConte
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [originCountry, setOriginCountry] = useState("");
+  const [economicRole, setEconomicRole] = useState("importer");
+  const [hasEuRepresentative, setHasEuRepresentative] = useState(false);
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>(["France"]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -53,22 +56,23 @@ export function NewProductForm({ persistence }: { persistence?: PersistenceConte
 
     setSaving(true);
     setError(undefined);
-    const supabase = createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setError("Votre session a expiré. Reconnectez-vous.");
-      setSaving(false);
-      return;
-    }
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Votre session a expiré. Reconnectez-vous.");
+      const normalizedSku = sku.trim();
+      const { data: duplicate, error: duplicateError } = await supabase.from("products").select("id").eq("org_id", persistence.organizationId).eq("sku", normalizedSku).limit(1).maybeSingle();
+      if (duplicateError) throw duplicateError;
+      if (duplicate) throw new Error("Cette référence / SKU existe déjà dans votre organisation.");
 
-    const sector = category === "Produit de construction" ? "construction" : "consumer";
-    const { data: product, error: productError } = await supabase
+      const sector = category === "Produit de construction" ? "construction" : "consumer";
+      const { data: product, error: productError } = await supabase
       .from("products")
       .insert({
         org_id: persistence.organizationId,
         created_by: user.id,
         name: name.trim(),
-        sku: sku.trim(),
+        sku: normalizedSku,
         category,
         sector,
         origin_country: originCountry.trim(),
@@ -80,44 +84,42 @@ export function NewProductForm({ persistence }: { persistence?: PersistenceConte
       .select("id")
       .single();
 
-    if (productError || !product) {
-      setError(productError?.message || "Le produit n'a pas pu être créé.");
-      setSaving(false);
-      return;
-    }
+      if (productError || !product) throw new Error(productError?.message || "Le produit n'a pas pu être créé.");
 
-    const { data: requirements } = await supabase
+      const { data: requirements, error: requirementsError } = await supabase
       .from("requirements")
       .select("id")
       .in("sector", ["cross-sector", sector]);
+      let checklistWarning = requirementsError ? `Le catalogue réglementaire n’a pas pu être chargé : ${requirementsError.message}` : undefined;
 
-    if (requirements?.length) {
-      const { error: checklistError } = await supabase.from("product_requirements").insert(
-        requirements.map((requirement) => ({
-          org_id: persistence.organizationId,
-          product_id: product.id,
-          requirement_id: requirement.id,
-          status: "pending",
-        })),
-      );
-      if (checklistError) {
-        setError(`Le produit est créé, mais la checklist doit être régénérée : ${checklistError.message}`);
-        setSaving(false);
-        return;
+      if (!requirementsError && requirements?.length) {
+        const { error: checklistError } = await supabase.from("product_requirements").insert(
+          requirements.map((requirement) => ({
+            org_id: persistence.organizationId,
+            product_id: product.id,
+            requirement_id: requirement.id,
+            status: "pending",
+          })),
+        );
+        if (checklistError) checklistWarning = `La checklist doit être régénérée : ${checklistError.message}`;
       }
+
+      await supabase.from("audit_events").insert({
+        org_id: persistence.organizationId,
+        user_id: user.id,
+        entity_type: "product",
+        entity_id: product.id,
+        action: "Dossier produit créé",
+        payload: { category, markets: selectedMarkets, description: description.trim() || null, economic_role: economicRole, eu_representative: hasEuRepresentative, checklist_warning: checklistWarning ?? null, source: "onboarding_v1_6" },
+      });
+
+      router.push(`/products/${product.id}?created=1${checklistWarning ? "&setup=partial" : ""}`);
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Le produit n’a pas pu être créé.");
+    } finally {
+      setSaving(false);
     }
-
-    await supabase.from("audit_events").insert({
-      org_id: persistence.organizationId,
-      user_id: user.id,
-      entity_type: "product",
-      entity_id: product.id,
-      action: "Dossier produit créé",
-      payload: { category, markets: selectedMarkets, source: "onboarding_v1" },
-    });
-
-    router.push(`/products/${product.id}?created=1`);
-    router.refresh();
   }
 
   return (
@@ -151,7 +153,7 @@ export function NewProductForm({ persistence }: { persistence?: PersistenceConte
                 <label className="field field-full"><span>Nom commercial</span><input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex. Lampe Luma Mini" required /></label>
                 <label className="field"><span>Référence / SKU</span><input value={sku} onChange={(event) => setSku(event.target.value)} placeholder="Ex. LUM-204-FR" required /></label>
                 <label className="field"><span>Catégorie</span><select value={category} onChange={(event) => setCategory(event.target.value)} required><option value="">Sélectionner</option><option>Équipement électrique</option><option>Équipement radio</option><option>Jouet</option><option>Produit de construction</option><option>Mobilier</option><option>Cosmétique</option><option>Autre produit de consommation</option></select></label>
-                <label className="field field-full"><span>Description courte <em>optionnel</em></span><textarea rows={4} placeholder="Fonction, utilisateurs visés, alimentation, matériaux principaux…" /></label>
+                <label className="field field-full"><span>Description courte <em>optionnel</em></span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Fonction, utilisateurs visés, alimentation, matériaux principaux…" /></label>
               </div>
             </fieldset>
           ) : null}
@@ -163,8 +165,8 @@ export function NewProductForm({ persistence }: { persistence?: PersistenceConte
               <div className="form-grid">
                 <label className="field field-full"><span>Raison sociale du fabricant</span><input autoFocus value={manufacturer} onChange={(event) => setManufacturer(event.target.value)} placeholder="Ex. Nordhavn Design ApS" required /></label>
                 <label className="field"><span>Pays de fabrication</span><input value={originCountry} onChange={(event) => setOriginCountry(event.target.value)} placeholder="Ex. Danemark" required /></label>
-                <label className="field"><span>Votre rôle</span><select defaultValue="importer"><option value="manufacturer">Fabricant</option><option value="importer">Importateur</option><option value="distributor">Distributeur</option><option value="agent">Mandataire</option></select></label>
-                <label className="check-card field-full"><input type="checkbox" /><span><strong>Un mandataire UE est désigné</strong><small>À cocher si le fabricant est établi hors de l’Union européenne.</small></span></label>
+                <label className="field"><span>Votre rôle</span><select value={economicRole} onChange={(event) => setEconomicRole(event.target.value)}><option value="manufacturer">Fabricant</option><option value="importer">Importateur</option><option value="distributor">Distributeur</option><option value="agent">Mandataire</option></select></label>
+                <label className="check-card field-full"><input type="checkbox" checked={hasEuRepresentative} onChange={(event) => setHasEuRepresentative(event.target.checked)} /><span><strong>Un mandataire UE est désigné</strong><small>À cocher si le fabricant est établi hors de l’Union européenne.</small></span></label>
               </div>
             </fieldset>
           ) : null}
