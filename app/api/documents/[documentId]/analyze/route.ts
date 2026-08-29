@@ -1,73 +1,17 @@
-import { APICallError, generateText, jsonSchema, Output } from "ai";
+import { APICallError, generateText } from "ai";
 import {
   DOCUMENT_ANALYSIS_MODEL,
   DOCUMENT_ANALYSIS_PROMPT_VERSION,
   estimateAnalysisCostUsd,
   isAnalyzableMimeType,
   isDocumentAnalysisResult,
+  parseDocumentAnalysisResponse,
   sanitizeAnalysisResult,
 } from "@/lib/document-analysis";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
-import type { DocumentAnalysisResult } from "@/lib/types";
 
 export const maxDuration = 60;
-
-const analysisSchema = jsonSchema<DocumentAnalysisResult>({
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    documentType: {
-      type: "string",
-      enum: ["Déclaration de conformité", "Rapport de laboratoire", "Certificat", "Notice", "Fiche technique", "Déclaration matière", "Photo / étiquette", "Autre"],
-    },
-    suggestedTitle: { type: ["string", "null"] },
-    manufacturerName: { type: ["string", "null"] },
-    productReference: { type: ["string", "null"] },
-    issuingBody: { type: ["string", "null"] },
-    issueDate: { type: ["string", "null"], description: "Date ISO YYYY-MM-DD ou null." },
-    expiryDate: { type: ["string", "null"], description: "Date ISO YYYY-MM-DD ou null." },
-    standards: { type: "array", items: { type: "string" }, maxItems: 20 },
-    regulationReferences: { type: "array", items: { type: "string" }, maxItems: 20 },
-    languageCodes: { type: "array", items: { type: "string" }, maxItems: 20 },
-    confidence: { type: "integer", minimum: 0, maximum: 100 },
-    evidenceQuality: { type: "string", enum: ["strong", "partial", "weak"] },
-    summary: { type: "string", maxLength: 800 },
-    warnings: { type: "array", items: { type: "string" }, maxItems: 10 },
-    requirementMatches: {
-      type: "array",
-      maxItems: 10,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          productRequirementId: { type: "string" },
-          title: { type: "string" },
-          reason: { type: "string" },
-          confidence: { type: "integer", minimum: 0, maximum: 100 },
-        },
-        required: ["productRequirementId", "title", "reason", "confidence"],
-      },
-    },
-  },
-  required: [
-    "documentType",
-    "suggestedTitle",
-    "manufacturerName",
-    "productReference",
-    "issuingBody",
-    "issueDate",
-    "expiryDate",
-    "standards",
-    "regulationReferences",
-    "languageCodes",
-    "confidence",
-    "evidenceQuality",
-    "summary",
-    "warnings",
-    "requirementMatches",
-  ],
-});
 
 function metadataString(metadata: Json, key: string) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
@@ -240,12 +184,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ doc
       `Marchés : ${(product.target_markets ?? []).join(", ") || "non renseignés"}`,
       `Exigences candidates : ${JSON.stringify(requirements)}`,
       "Les avertissements doivent signaler les incohérences, informations absentes ou points à vérifier humainement.",
+      "Réponds exclusivement avec un objet JSON valide, sans markdown ni commentaire avant ou après.",
+      "Utilise exactement tous les champs de cette structure :",
+      JSON.stringify({
+        documentType: "Autre",
+        suggestedTitle: null,
+        manufacturerName: null,
+        productReference: null,
+        issuingBody: null,
+        issueDate: null,
+        expiryDate: null,
+        standards: [],
+        regulationReferences: [],
+        languageCodes: [],
+        confidence: 0,
+        evidenceQuality: "weak",
+        summary: "",
+        warnings: [],
+        requirementMatches: [{ productRequirementId: "identifiant exact fourni", title: "", reason: "", confidence: 0 }],
+      }),
+      "documentType doit être l’une de ces valeurs : Déclaration de conformité, Rapport de laboratoire, Certificat, Notice, Fiche technique, Déclaration matière, Photo / étiquette, Autre.",
+      "evidenceQuality doit être strong, partial ou weak. Les dates doivent être au format YYYY-MM-DD ou null.",
+      "Si aucune exigence ne correspond réellement, requirementMatches doit être une liste vide.",
     ].join("\n");
 
-    const { output, usage } = await generateText({
+    const { text, usage } = await generateText({
       model: DOCUMENT_ANALYSIS_MODEL,
-      output: Output.object({ schema: analysisSchema }),
       maxOutputTokens: 2500,
+      temperature: 0,
       providerOptions: {
         gateway: {
           tags: ["feature:document-intelligence", "environment:production"],
@@ -265,7 +231,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ doc
       }],
     });
 
-    const result = sanitizeAnalysisResult(output, new Set(requirements.map((item) => item.productRequirementId)));
+    const parsed = parseDocumentAnalysisResponse(text);
+    const result = sanitizeAnalysisResult(parsed, new Set(requirements.map((item) => item.productRequirementId)));
     const tokenUsage = {
       inputTokens: usage.inputTokens ?? 0,
       outputTokens: usage.outputTokens ?? 0,

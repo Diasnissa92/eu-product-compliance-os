@@ -69,6 +69,61 @@ export function sanitizeAnalysisResult(
   };
 }
 
+function extractJsonObjects(text: string) {
+  const objects: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (start < 0) {
+      if (character === "{") {
+        start = index;
+        depth = 1;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+
+    if (character === "\"") inString = true;
+    else if (character === "{") depth += 1;
+    else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        objects.push(text.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+
+  return objects;
+}
+
+export function parseDocumentAnalysisResponse(text: string): DocumentAnalysisResult {
+  const trimmed = text.trim().replace(/^\uFEFF/, "");
+  const fenced = [...trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)].map((match) => match[1].trim());
+  const candidates = [...new Set([trimmed, ...fenced, ...extractJsonObjects(trimmed)])];
+
+  for (const candidate of candidates) {
+    try {
+      const value = JSON.parse(candidate) as Json;
+      if (isDocumentAnalysisResult(value)) return value;
+    } catch {
+      // Un candidat peut être du texte explicatif ; le suivant peut contenir le JSON valide.
+    }
+  }
+
+  throw new Error("La réponse du modèle ne contient pas de résultat JSON exploitable.");
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
