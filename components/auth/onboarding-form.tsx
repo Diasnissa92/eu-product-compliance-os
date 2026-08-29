@@ -22,37 +22,27 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
     setPending(true);
     setError(undefined);
 
-    const supabase = createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setError("Votre session a expiré. Reconnectez-vous.");
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Votre session a expiré. Reconnectez-vous.");
+      const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: fullName.trim(), job_title: "Administrateur" });
+      if (profileError) throw profileError;
+      const suffix = crypto.randomUUID().slice(0, 6);
+      const { error: organizationError } = await supabase.from("organizations").insert({
+        name: organizationName.trim(),
+        slug: `${slugify(organizationName) || "organisation"}-${suffix}`,
+        country_code: countryCode,
+        created_by: user.id,
+      });
+      if (organizationError) throw organizationError;
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "L’organisation n’a pas pu être créée.");
+    } finally {
       setPending(false);
-      return;
     }
-
-    const { error: profileError } = await supabase.from("profiles").upsert({ id: user.id, full_name: fullName.trim(), job_title: "Administrateur" });
-    if (profileError) {
-      setError(profileError.message);
-      setPending(false);
-      return;
-    }
-
-    const suffix = crypto.randomUUID().slice(0, 6);
-    const { error: organizationError } = await supabase.from("organizations").insert({
-      name: organizationName.trim(),
-      slug: `${slugify(organizationName) || "organisation"}-${suffix}`,
-      country_code: countryCode,
-      created_by: user.id,
-    });
-
-    if (organizationError) {
-      setError(organizationError.message);
-      setPending(false);
-      return;
-    }
-
-    router.replace("/dashboard");
-    router.refresh();
   }
 
   return (

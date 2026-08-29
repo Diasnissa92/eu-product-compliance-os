@@ -1,7 +1,8 @@
 "use client";
 
 import { AlertCircle, CalendarDays, FileText, Landmark, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
+import { useModalDialog } from "@/components/ui/use-modal-dialog";
 import { createClient } from "@/lib/supabase/client";
 import type { PortfolioDocument } from "@/lib/types";
 
@@ -39,6 +40,8 @@ export function DocumentMetadataDialog({
   const [expiryDate, setExpiryDate] = useState(document.expiresOn ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const closeDialog = useCallback(() => onClose(), [onClose]);
+  const { dialogRef } = useModalDialog({ open: true, onClose: closeDialog, canClose: !saving });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,55 +63,44 @@ export function DocumentMetadataDialog({
     }
 
     setSaving(true);
-    const supabase = createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setError("Votre session a expiré. Reconnectez-vous avant d’enregistrer.");
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Votre session a expiré. Reconnectez-vous avant d’enregistrer.");
+      const { error: updateError } = await supabase
+        .from("documents")
+        .update({
+          document_type: documentType,
+          issuing_body: issuingBody.trim() || null,
+          issue_date: issueDate || null,
+          expiry_date: expiryDate || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", document.id)
+        .eq("product_id", document.productId)
+        .eq("org_id", document.organizationId);
+      if (updateError) throw new Error(`Les informations n’ont pas pu être enregistrées : ${updateError.message}`);
+      await supabase.from("audit_events").insert({
+        org_id: document.organizationId,
+        user_id: user.id,
+        entity_type: "document",
+        entity_id: document.productId,
+        action: "Métadonnées documentaires mises à jour",
+        payload: { document_id: document.id, document_type: documentType, issue_date: issueDate || null, expiry_date: expiryDate || null },
+      });
+      onSaved(updatedDocument);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Les informations n’ont pas pu être enregistrées.");
+    } finally {
       setSaving(false);
-      return;
     }
-
-    const { error: updateError } = await supabase
-      .from("documents")
-      .update({
-        document_type: documentType,
-        issuing_body: issuingBody.trim() || null,
-        issue_date: issueDate || null,
-        expiry_date: expiryDate || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", document.id)
-      .eq("product_id", document.productId)
-      .eq("org_id", document.organizationId);
-
-    if (updateError) {
-      setError(`Les informations n’ont pas pu être enregistrées : ${updateError.message}`);
-      setSaving(false);
-      return;
-    }
-
-    await supabase.from("audit_events").insert({
-      org_id: document.organizationId,
-      user_id: user.id,
-      entity_type: "document",
-      entity_id: document.productId,
-      action: "Métadonnées documentaires mises à jour",
-      payload: {
-        document_id: document.id,
-        document_type: documentType,
-        issue_date: issueDate || null,
-        expiry_date: expiryDate || null,
-      },
-    });
-
-    onSaved(updatedDocument);
   }
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !saving) onClose();
     }}>
-      <section className="metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="metadata-dialog-title">
+      <section ref={dialogRef} tabIndex={-1} className="metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="metadata-dialog-title">
         <div className="metadata-dialog-heading">
           <div>
             <span className="eyebrow">Fiche documentaire</span>

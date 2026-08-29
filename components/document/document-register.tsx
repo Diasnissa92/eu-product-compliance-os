@@ -11,12 +11,14 @@ import {
   Filter,
   Pencil,
   Search,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import { DocumentAnalysisAction } from "@/components/document/document-analysis-action";
 import { DocumentMetadataDialog } from "@/components/document/document-metadata-dialog";
+import { downloadBlob } from "@/lib/client-actions";
 import { createClient } from "@/lib/supabase/client";
 import type { PortfolioDocument, ProductDocument } from "@/lib/types";
 
@@ -117,23 +119,17 @@ export function DocumentRegister({
     if (!document.filePath) return;
     setError(undefined);
     setDownloadingId(document.id);
-    const { data, error: downloadError } = await createClient().storage
-      .from("compliance-documents")
-      .download(document.filePath);
-
-    if (downloadError || !data) {
-      setError(`Le téléchargement a échoué : ${downloadError?.message ?? "erreur inconnue"}`);
+    try {
+      const { data, error: downloadError } = await createClient().storage
+        .from("compliance-documents")
+        .download(document.filePath);
+      if (downloadError || !data) throw new Error(downloadError?.message ?? "erreur inconnue");
+      downloadBlob(data, document.name);
+    } catch (caughtError) {
+      setError(`Le téléchargement a échoué : ${caughtError instanceof Error ? caughtError.message : "erreur inconnue"}`);
+    } finally {
       setDownloadingId(undefined);
-      return;
     }
-
-    const objectUrl = URL.createObjectURL(data);
-    const link = window.document.createElement("a");
-    link.href = objectUrl;
-    link.download = document.name;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    setDownloadingId(undefined);
   }
 
   return (
@@ -147,6 +143,7 @@ export function DocumentRegister({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Rechercher par document, produit ou référence…"
           />
+          {query ? <button className="search-clear" type="button" onClick={() => setQuery("")} aria-label="Effacer la recherche"><X size={15} /></button> : null}
         </label>
         <label className="sort-field">
           <ArrowUpDown size={16} />
@@ -166,12 +163,15 @@ export function DocumentRegister({
             type="button"
             key={item.value}
             onClick={() => setFilter(item.value)}
+            aria-pressed={filter === item.value}
           >
             {item.label}
             <span>{item.value === "all" ? localDocuments.length : localDocuments.filter((document) => document.status === item.value).length}</span>
           </button>
         ))}
       </div>
+
+      <p className="results-status" aria-live="polite">{filteredDocuments.length} document{filteredDocuments.length > 1 ? "s" : ""} affiché{filteredDocuments.length > 1 ? "s" : ""}</p>
 
       {message ? <div className="inline-message document-register-error" aria-live="polite"><CheckCircle2 size={16} />{message}</div> : null}
       {error ? <div className="inline-message inline-message-error document-register-error" role="alert">{error}</div> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpDown, ChevronRight, Filter, Search } from "lucide-react";
+import { ArrowUpDown, ChevronRight, Filter, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 import { ProductVisual } from "@/components/product-visual";
@@ -56,6 +56,7 @@ export function ProductTable({ products, compact = false }: { products: Product[
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Rechercher par produit, SKU, fabricant…"
             />
+            {query ? <button className="search-clear" type="button" onClick={() => setQuery("")} aria-label="Effacer la recherche"><X size={15} /></button> : null}
           </label>
           <label className="sort-field product-sort-field">
             <ArrowUpDown size={16} />
@@ -78,6 +79,7 @@ export function ProductTable({ products, compact = false }: { products: Product[
               type="button"
               key={item.value}
               onClick={() => setFilter(item.value)}
+              aria-pressed={filter === item.value}
             >
               {item.label}
               <span>
@@ -89,6 +91,8 @@ export function ProductTable({ products, compact = false }: { products: Product[
           ))}
         </div>
       ) : null}
+
+      {!compact ? <p className="results-status" aria-live="polite">{filteredProducts.length} produit{filteredProducts.length > 1 ? "s" : ""} affiché{filteredProducts.length > 1 ? "s" : ""}</p> : null}
 
       <div className="table-scroll">
         <table className="product-table">

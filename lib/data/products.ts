@@ -125,6 +125,7 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
   const profileIds = [...new Set([
     ...(requirementRows ?? []).map((row) => row.assigned_to).filter((value): value is string => Boolean(value)),
     ...(commentRows ?? []).map((row) => row.author_id),
+    ...(auditRows ?? []).map((row) => row.user_id).filter((value): value is string => Boolean(value)),
   ])];
   const { data: collaborationProfiles } = profileIds.length
     ? await supabase.from("profiles").select("id, full_name").in("id", profileIds)
@@ -196,14 +197,16 @@ export async function getWorkspaceProduct(workspace: WorkspaceContext, productId
     title: row.action,
     detail: `${row.entity_type} · événement enregistré dans le journal sécurisé`,
     date: formatDate(row.created_at),
-    actor: row.user_id ? "Utilisateur de l’organisation" : "Système",
+    actor: row.user_id ? profileNames.get(row.user_id) || "Membre de l’organisation" : "Système",
   }));
 
   const product = baseProduct(productRow);
   const frameworks = [...new Set((requirementRows ?? []).map((row) => row.requirements.regulations.code))];
+  const today = new Date().toISOString().slice(0, 10);
   const upcomingExpiry = (documentRows ?? [])
     .map((row) => row.expiry_date)
     .filter((value): value is string => Boolean(value))
+    .filter((value) => value >= today)
     .sort()[0];
 
   return {

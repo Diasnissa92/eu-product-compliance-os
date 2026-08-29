@@ -27,8 +27,15 @@ import { getWorkspaceProduct } from "@/lib/data/products";
 import { getWorkspaceTeam } from "@/lib/data/team";
 import { complianceStatusCopy } from "@/lib/status";
 
-export default async function ProductDetailPage({ params }: { params: Promise<{ productId: string }> }) {
+export default async function ProductDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ productId: string }>;
+  searchParams: Promise<{ created?: string; setup?: string }>;
+}) {
   const { productId } = await params;
+  const query = await searchParams;
   const workspace = await getWorkspaceContext();
   const [product, team] = await Promise.all([
     getWorkspaceProduct(workspace, productId),
@@ -58,6 +65,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </div>
         <ProductActions productId={product.id} />
       </section>
+
+      {query.created === "1" ? <div className="inline-message product-page-message" aria-live="polite"><CircleCheckBig size={16} />Le dossier produit a bien été créé.</div> : null}
+      {query.setup === "partial" ? <div className="inline-message inline-message-error product-page-message" role="alert"><ShieldAlert size={16} />Le produit est enregistré, mais sa checklist n’a pas pu être générée. Le dossier reste accessible et aucun doublon ne sera créé.</div> : null}
 
       <section className={`status-banner banner-${product.status}`}>
         <span className="banner-icon">{product.status === "compliant" ? <CircleCheckBig size={22} /> : <ShieldAlert size={22} />}</span>

@@ -27,6 +27,10 @@ export function TeamManagement({ authenticated, canManage, currentUserId, member
     event.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !organizationId && authenticated) return;
+    if (localMembers.some((member) => member.email?.toLowerCase() === normalizedEmail)) {
+      setError("Cette personne appartient déjà à l’équipe ou possède une invitation en attente.");
+      return;
+    }
 
     setPendingAction("invite");
     setMessage(null);
@@ -50,22 +54,21 @@ export function TeamManagement({ authenticated, canManage, currentUserId, member
       return;
     }
 
-    const { data, error: inviteError } = await createClient().functions.invoke("invite-member", {
-      body: { organizationId, email: normalizedEmail, fullName: fullName.trim(), role },
-    });
-
-    if (inviteError || !data?.member) {
-      setError(data?.error || inviteError?.message || "L’invitation n’a pas pu être envoyée.");
+    try {
+      const { data, error: inviteError } = await createClient().functions.invoke("invite-member", {
+        body: { organizationId, email: normalizedEmail, fullName: fullName.trim(), role },
+      });
+      if (inviteError || !data?.member) throw new Error(data?.error || inviteError?.message || "L’invitation n’a pas pu être envoyée.");
+      const member = data.member as TeamMember;
+      setLocalMembers((current) => [...current.filter((item) => item.userId !== member.userId), member]);
+      setEmail("");
+      setFullName("");
+      setMessage(data.message || `Invitation envoyée à ${normalizedEmail}.`);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "L’invitation n’a pas pu être envoyée.");
+    } finally {
       setPendingAction(undefined);
-      return;
     }
-
-    const member = data.member as TeamMember;
-    setLocalMembers((current) => [...current.filter((item) => item.userId !== member.userId), member]);
-    setEmail("");
-    setFullName("");
-    setMessage(data.message || `Invitation envoyée à ${normalizedEmail}.`);
-    setPendingAction(undefined);
   }
 
   async function changeRole(member: TeamMember, nextRole: TeamRole) {
@@ -74,22 +77,22 @@ export function TeamManagement({ authenticated, canManage, currentUserId, member
     setMessage(null);
     setError(null);
 
-    if (authenticated) {
-      const { error: updateError } = await createClient().rpc("update_organization_member_role", {
-        p_org_id: organizationId!,
-        p_user_id: member.userId,
-        p_role: nextRole,
-      });
-      if (updateError) {
-        setError(`Le rôle n’a pas pu être modifié : ${updateError.message}`);
-        setPendingAction(undefined);
-        return;
+    try {
+      if (authenticated) {
+        const { error: updateError } = await createClient().rpc("update_organization_member_role", {
+          p_org_id: organizationId!,
+          p_user_id: member.userId,
+          p_role: nextRole,
+        });
+        if (updateError) throw new Error(`Le rôle n’a pas pu être modifié : ${updateError.message}`);
       }
+      setLocalMembers((current) => current.map((item) => item.userId === member.userId ? { ...item, role: nextRole } : item));
+      setMessage(`Le rôle de ${member.fullName} a été mis à jour.`);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Le rôle n’a pas pu être modifié.");
+    } finally {
+      setPendingAction(undefined);
     }
-
-    setLocalMembers((current) => current.map((item) => item.userId === member.userId ? { ...item, role: nextRole } : item));
-    setMessage(`Le rôle de ${member.fullName} a été mis à jour.`);
-    setPendingAction(undefined);
   }
 
   const activeCount = localMembers.filter((member) => member.status === "active").length;
