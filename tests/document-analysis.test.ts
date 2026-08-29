@@ -3,6 +3,7 @@ import {
   estimateAnalysisCostUsd,
   isAnalyzableMimeType,
   isDocumentAnalysisResult,
+  parseDocumentAnalysisResponse,
   safeAnalysisDate,
   sanitizeAnalysisResult,
 } from "../lib/document-analysis";
@@ -62,5 +63,15 @@ describe("document intelligence", () => {
       ...baseResult,
       requirementMatches: [{ productRequirementId: "allowed" }],
     })).toBe(false);
+  });
+
+  it("extracts a valid analysis wrapped in model commentary", () => {
+    const response = `Voici le résultat :\n\`\`\`json\n${JSON.stringify(baseResult)}\n\`\`\``;
+    expect(parseDocumentAnalysisResponse(response)).toEqual(baseResult);
+  });
+
+  it("rejects a model response without the required analysis shape", () => {
+    expect(() => parseDocumentAnalysisResponse("Résultat : {\"summary\":\"incomplet\"}"))
+      .toThrow("ne contient pas de résultat JSON exploitable");
   });
 });
