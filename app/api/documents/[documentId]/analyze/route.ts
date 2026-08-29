@@ -1,4 +1,4 @@
-import { generateText, jsonSchema, Output } from "ai";
+import { APICallError, generateText, jsonSchema, Output } from "ai";
 import {
   DOCUMENT_ANALYSIS_MODEL,
   DOCUMENT_ANALYSIS_PROMPT_VERSION,
@@ -99,7 +99,24 @@ function mapAnalysis(row: {
   };
 }
 
+function publicAnalysisError(error: unknown) {
+  if (!APICallError.isInstance(error)) {
+    return "L’analyse n’a pas abouti. Le document est conservé et peut être relancé.";
+  }
+  if (error.statusCode === 402) {
+    return "Les crédits du service d’analyse sont épuisés. Le document est conservé.";
+  }
+  if (error.statusCode === 403) {
+    return "Le modèle d’analyse n’est pas autorisé avec la configuration IA actuelle.";
+  }
+  if (error.statusCode === 429) {
+    return "Le service d’analyse reçoit trop de demandes. Réessayez dans quelques minutes.";
+  }
+  return "Le service d’analyse est temporairement indisponible. Le document est conservé.";
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ documentId: string }> }) {
+  const startedAt = Date.now();
   const requestOrigin = request.headers.get("origin");
   if (requestOrigin && requestOrigin !== new URL(request.url).origin) {
     return Response.json({ error: "Origine de requête refusée." }, { status: 403 });
@@ -188,6 +205,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ doc
   }
 
   try {
+    console.info(JSON.stringify({
+      level: "info",
+      message: "document_analysis_started",
+      route: "/api/documents/[documentId]/analyze",
+      analysisId: analysisRow.id,
+      documentId: document.id,
+      model: DOCUMENT_ANALYSIS_MODEL,
+    }));
     const { data: file, error: downloadError } = await supabase.storage
       .from("compliance-documents")
       .download(document.file_path);
@@ -221,7 +246,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ doc
       model: DOCUMENT_ANALYSIS_MODEL,
       output: Output.object({ schema: analysisSchema }),
       maxOutputTokens: 2500,
-      reasoning: "low",
+      providerOptions: {
+        gateway: {
+          tags: ["feature:document-intelligence", "environment:production"],
+        },
+      },
       messages: [{
         role: "user",
         content: [
@@ -269,13 +298,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ doc
       payload: { document_id: document.id, analysis_id: analysisRow.id, model: DOCUMENT_ANALYSIS_MODEL },
     });
 
+    console.info(JSON.stringify({
+      level: "info",
+      message: "document_analysis_completed",
+      route: "/api/documents/[documentId]/analyze",
+      analysisId: analysisRow.id,
+      documentId: document.id,
+      model: DOCUMENT_ANALYSIS_MODEL,
+      durationMs: Date.now() - startedAt,
+      estimatedCostUsd,
+    }));
+
     return Response.json({ analysis: mapAnalysis(completed), reused: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur d’analyse inconnue";
+    const statusCode = APICallError.isInstance(error) ? error.statusCode : undefined;
+    console.error(JSON.stringify({
+      level: "error",
+      message: "document_analysis_failed",
+      route: "/api/documents/[documentId]/analyze",
+      analysisId: analysisRow.id,
+      documentId: document.id,
+      model: DOCUMENT_ANALYSIS_MODEL,
+      statusCode,
+      error: message.slice(0, 500),
+      durationMs: Date.now() - startedAt,
+    }));
     await supabase
       .from("document_analyses")
       .update({ status: "failed", error_message: message.slice(0, 500), completed_at: new Date().toISOString() })
       .eq("id", analysisRow.id);
-    return Response.json({ error: "L’analyse n’a pas abouti. Le document est conservé et peut être relancé.", detail: message }, { status: 502 });
+    return Response.json({ error: publicAnalysisError(error) }, { status: 502 });
   }
 }
