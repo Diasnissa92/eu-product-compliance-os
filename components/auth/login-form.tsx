@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
+import { PasswordField } from "@/components/auth/password-field";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
 
@@ -83,7 +84,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       <form className="auth-form" onSubmit={submit}>
         {mode === "sign-up" ? <label className="field"><span>Nom complet</span><input autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Hugo Dias" required /></label> : null}
         <label className="field"><span>Adresse e-mail</span><input autoComplete="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="vous@entreprise.fr" required /></label>
-        <label className="field"><span>Mot de passe</span><input autoComplete={mode === "sign-in" ? "current-password" : "new-password"} type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8 caractères minimum" required /></label>
+        <PasswordField label="Mot de passe" autoComplete={mode === "sign-in" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8 caractères minimum" />
         {mode === "sign-in" ? <Link className="auth-recovery-link" href="/forgot-password">Mot de passe oublié ?</Link> : null}
         {error ? <p className="form-feedback form-feedback-error" role="alert">{error}</p> : null}
         {message ? <p className="form-feedback form-feedback-success"><CheckCircle2 size={16} />{message}</p> : null}
