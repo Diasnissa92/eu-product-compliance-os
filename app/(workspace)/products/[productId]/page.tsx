@@ -32,7 +32,7 @@ export default async function ProductDetailPage({
   searchParams,
 }: {
   params: Promise<{ productId: string }>;
-  searchParams: Promise<{ created?: string; setup?: string }>;
+  searchParams: Promise<{ created?: string; setup?: string; requirement?: string }>;
 }) {
   const { productId } = await params;
   const query = await searchParams;
@@ -103,6 +103,7 @@ export default async function ProductDetailPage({
               key={product.requirements.map((requirement) => `${requirement.id}:${requirement.status}:${requirement.evidenceDocumentId ?? ""}`).join("|")}
               requirements={product.requirements}
               documents={product.documents}
+              initialOpenId={query.requirement}
               persistence={persistence}
               collaboration={{
                 members: team,

@@ -1,6 +1,7 @@
 export type ComplianceStatus = "compliant" | "incomplete" | "risk" | "blocking";
 export type RequirementStatus = "verified" | "pending" | "missing" | "rejected" | "not-applicable";
 export type RequirementSeverity = "low" | "medium" | "high" | "blocking";
+export type ComplianceActionPriority = "overdue" | "urgent" | "planned" | "unscheduled";
 export type TeamRole = "owner" | "admin" | "editor" | "reviewer" | "viewer";
 
 export type TeamMember = {
@@ -83,6 +84,25 @@ export type Requirement = {
   comments?: RequirementComment[];
   evidenceDocumentId?: string;
   evidenceDocumentName?: string;
+};
+
+export type ComplianceAction = {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  requirementId: string;
+  title: string;
+  regulation: string;
+  status: Exclude<RequirementStatus, "verified" | "not-applicable">;
+  severity: RequirementSeverity;
+  assigneeId?: string;
+  owner?: string;
+  dueDate?: string;
+  dueDateValue?: string;
+  daysRemaining?: number;
+  priority: ComplianceActionPriority;
+  actionHref: string;
 };
 
 export type ProductDocument = {

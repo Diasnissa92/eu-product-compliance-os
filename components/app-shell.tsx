@@ -7,6 +7,7 @@ import {
   CircleHelp,
   FileStack,
   LayoutDashboard,
+  ListChecks,
   Menu,
   Settings,
   Sparkles,
@@ -25,6 +26,7 @@ const navigation = [
   { href: "/dashboard", label: "Vue d’ensemble", icon: LayoutDashboard },
   { href: "/products", label: "Produits", icon: Boxes },
   { href: "/documents", label: "Documents", icon: FileStack },
+  { href: "/actions", label: "Actions", icon: ListChecks },
   { href: "/team", label: "Équipe", icon: UsersRound },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];

@@ -18,6 +18,7 @@ const statusIcon: Record<RequirementStatus, typeof Check> = {
 type RequirementChecklistProps = {
   requirements: Requirement[];
   documents: ProductDocument[];
+  initialOpenId?: string;
   persistence?: PersistenceContext;
   collaboration: {
     members: TeamMember[];
@@ -29,9 +30,11 @@ type RequirementChecklistProps = {
   };
 };
 
-export function RequirementChecklist({ requirements, documents, persistence, collaboration }: RequirementChecklistProps) {
+export function RequirementChecklist({ requirements, documents, initialOpenId, persistence, collaboration }: RequirementChecklistProps) {
   const router = useRouter();
-  const [openId, setOpenId] = useState<string | null>(requirements[0]?.id ?? null);
+  const [openId, setOpenId] = useState<string | null>(() =>
+    requirements.some((requirement) => requirement.id === initialOpenId) ? initialOpenId ?? null : requirements[0]?.id ?? null,
+  );
   const [localRequirements, setLocalRequirements] = useState(requirements);
   const [selectedDocuments, setSelectedDocuments] = useState<Record<string, string>>(() =>
     Object.fromEntries(requirements.map((requirement) => [requirement.id, requirement.evidenceDocumentId ?? ""])),
@@ -197,7 +200,7 @@ export function RequirementChecklist({ requirements, documents, persistence, col
           const Icon = statusIcon[requirement.status];
           const open = openId === requirement.id;
           return (
-            <article className={`requirement-item requirement-${requirement.status}`} key={requirement.id}>
+            <article id={`requirement-${requirement.id}`} className={`requirement-item requirement-${requirement.status}`} key={requirement.id}>
               <button
                 type="button"
                 className="requirement-summary"
