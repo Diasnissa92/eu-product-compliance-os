@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 import Link from "next/link";
 import { ProductExportButton } from "@/components/product/product-export-button";
 import { ProductTable } from "@/components/product/product-table";
@@ -21,6 +21,7 @@ export default async function ProductsPage() {
         </div>
         <div className="heading-actions">
           <ProductExportButton products={products} />
+          <Link className="button button-secondary" href="/products/import"><FileSpreadsheet size={18} />Importer un CSV</Link>
           <Link className="button button-primary" href="/products/new"><Plus size={18} />Ajouter un produit</Link>
         </div>
       </section>
