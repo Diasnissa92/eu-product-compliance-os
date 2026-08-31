@@ -1275,6 +1275,10 @@ export type Database = {
         }
         Returns: Json
       }
+      verify_runtime_secret: {
+        Args: { p_name: string; p_secret: string }
+        Returns: boolean
+      }
       update_organization_member_role: {
         Args: { p_org_id: string; p_role: string; p_user_id: string }
         Returns: Json
