@@ -10,7 +10,9 @@ const complete: EcommerceListingInput = {
   responsiblePersonName: "",
   responsiblePersonPostalAddress: "",
   responsiblePersonElectronicAddress: "",
+  warningsApplicable: true,
   warnings: "Usage intérieur uniquement.",
+  warningsNotApplicableReason: "",
   language: "Français",
   traceabilityImage: true,
 };
@@ -23,8 +25,8 @@ describe("auditEcommerceListing", () => {
     expect(result.findings.filter((item) => item.status === "fail")).toHaveLength(0);
   });
 
-  it("bloque une offre sans référence et sans avertissements", () => {
-    const result = auditEcommerceListing({ ...complete, productIdentifier: "", warnings: "" }, true);
+  it("bloque une offre sans référence, image ni avertissements applicables", () => {
+    const result = auditEcommerceListing({ ...complete, productIdentifier: "", warnings: "", traceabilityImage: false }, true);
     expect(result.status).toBe("blocking");
     expect(result.score).toBeLessThan(80);
   });
@@ -33,5 +35,17 @@ describe("auditEcommerceListing", () => {
     const result = auditEcommerceListing(complete, false);
     expect(result.findings.filter((item) => item.id.toString().startsWith("responsible") && item.status === "fail")).toHaveLength(3);
   });
-});
 
+  it("accepte l’absence d’avertissement uniquement avec une justification documentée", () => {
+    const result = auditEcommerceListing({ ...complete, warningsApplicable: false, warnings: "", warningsNotApplicableReason: "Analyse de risques documentée : aucune information de sécurité spécifique." }, true);
+    expect(result.findings.find((item) => item.id === "warnings")?.status).toBe("warning");
+    expect(result.findings.find((item) => item.id === "warningsNotApplicableReason")?.status).toBe("pass");
+    expect(result.status).toBe("compliant");
+  });
+
+  it("refuse une fausse adresse électronique", () => {
+    const result = auditEcommerceListing({ ...complete, manufacturerElectronicAddress: "contact" }, true);
+    expect(result.findings.find((item) => item.id === "manufacturerElectronicAddress")?.status).toBe("fail");
+    expect(result.status).toBe("blocking");
+  });
+});
