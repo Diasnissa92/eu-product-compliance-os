@@ -1,3 +1,5 @@
+import Papa from "papaparse";
+
 export type ProductImportRow = {
   name: string;
   sku: string;
@@ -36,56 +38,47 @@ function normalizeHeader(value: string) {
   return value.trim().toLocaleLowerCase("fr").replace(/[\s_'’-]/g, "");
 }
 
-function parseLine(line: string, delimiter: string) {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (character === '"') {
-      if (quoted && line[index + 1] === '"') {
-        current += '"';
-        index += 1;
-      } else quoted = !quoted;
-    } else if (character === delimiter && !quoted) {
-      cells.push(current.trim());
-      current = "";
-    } else current += character;
-  }
-  cells.push(current.trim());
-  return cells;
-}
-
 export function parseProductCsv(source: string): ProductImportPreview {
   const normalized = source.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
   if (!normalized) return { rows: [], errors: [{ row: 1, message: "Le fichier est vide." }] };
-  const lines = normalized.split("\n").filter((line) => line.trim());
-  const delimiter = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ",";
-  const rawHeaders = parseLine(lines[0], delimiter);
+  const parsed = Papa.parse<string[]>(normalized, { skipEmptyLines: "greedy" });
+  const rawRows = parsed.data;
+  const errors: Array<{ row: number; message: string }> = parsed.errors.map((error) => ({ row: (error.row ?? 0) + 1, message: `CSV invalide : ${error.message}` }));
+  if (!rawRows.length) return { rows: [], errors: [{ row: 1, message: "Le fichier est vide." }] };
+  const rawHeaders = rawRows[0].map((header) => String(header || ""));
   const headers = rawHeaders.map((header) => aliases[normalizeHeader(header)]);
-  const errors: Array<{ row: number; message: string }> = [];
   if (!headers.includes("name") || !headers.includes("sku")) {
     return { rows: [], errors: [{ row: 1, message: "Les colonnes nom/name et SKU/référence sont obligatoires." }] };
   }
 
-  const rows = lines.slice(1, 101).flatMap((line, index) => {
-    const cells = parseLine(line, delimiter);
+  const seenSkus = new Set<string>();
+  const rows = rawRows.slice(1, 101).flatMap((cells, index) => {
     const row: ProductImportRow = { name: "", sku: "", category: "", manufacturer: "", originCountry: "", targetMarkets: [] };
     headers.forEach((header, cellIndex) => {
       if (!header) return;
-      if (header === "targetMarkets") row.targetMarkets = (cells[cellIndex] || "").split(/[|,/]/).map((value) => value.trim()).filter(Boolean);
-      else row[header] = cells[cellIndex]?.trim() || "";
+      const cell = String(cells[cellIndex] || "").trim();
+      if (header === "targetMarkets") row.targetMarkets = cell.split(/[|,/]/).map((value) => value.trim()).filter(Boolean).slice(0, 30);
+      else row[header] = cell;
     });
     if (!row.name || !row.sku) {
       errors.push({ row: index + 2, message: "Nom et SKU sont obligatoires." });
       return [];
     }
+    if ([row.name, row.sku, row.category, row.manufacturer, row.originCountry].some((value) => value.length > 240)) {
+      errors.push({ row: index + 2, message: "Une valeur dépasse la limite de 240 caractères." });
+      return [];
+    }
+    const normalizedSku = row.sku.toLocaleLowerCase("fr");
+    if (seenSkus.has(normalizedSku)) {
+      errors.push({ row: index + 2, message: `SKU dupliqué dans le fichier : ${row.sku}` });
+      return [];
+    }
+    seenSkus.add(normalizedSku);
     return [row];
   });
 
-  if (lines.length > 101) errors.push({ row: 102, message: "Seules les 100 premières lignes ont été préparées." });
+  if (rawRows.length > 101) errors.push({ row: 102, message: "Seules les 100 premières lignes ont été préparées." });
   return { rows, errors };
 }
 
 export const productImportTemplate = "nom;sku;catégorie;fabricant;pays_origine;marchés\nLampe Luma Mini;LUM-204-FR;Équipement électrique;Nordhavn Design ApS;Danemark;France|Belgique";
-

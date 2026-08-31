@@ -35,7 +35,11 @@ export function SupplierRequestManager({
   const [feedback, setFeedback] = useState<string>();
   const [error, setError] = useState<string>();
   const openCount = requests.filter((request) => !["completed", "cancelled", "expired"].includes(request.status)).length;
-  const responseByRequest = useMemo(() => new Map(responses.map((response) => [response.requestId, response])), [responses]);
+  const responsesByRequest = useMemo(() => {
+    const grouped = new Map<string, SupplierResponseRecord[]>();
+    responses.forEach((response) => grouped.set(response.requestId, [...(grouped.get(response.requestId) || []), response]));
+    return grouped;
+  }, [responses]);
 
   async function createRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,15 +146,14 @@ export function SupplierRequestManager({
         <div className="professional-panel-heading compact"><div><span className="eyebrow">Suivi</span><h2>Demandes fournisseurs</h2></div><span className="professional-count">{requests.length}</span></div>
         {requests.length ? <div className="professional-list">{requests.map((request) => {
           const product = products.find((item) => item.id === request.productId);
-          const response = responseByRequest.get(request.id);
+          const requestResponses = responsesByRequest.get(request.id) || [];
           return <article className="professional-row" key={request.id}>
             <span className={`professional-status status-${request.status}`}>{statusCopy[request.status] || request.status}</span>
-            <div className="professional-row-copy"><strong>{request.subject}</strong><p>{request.supplierName} · {request.supplierEmail}</p><small>{product?.name || "Produit"}{request.dueDate ? ` · attendu le ${new Intl.DateTimeFormat("fr-FR").format(new Date(request.dueDate))}` : ""}</small>{response ? <a className="inline-link" href={response.documentUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} />{response.documentName}</a> : null}</div>
-            <div className="professional-row-actions"><button className="button button-secondary button-small" type="button" onClick={() => copyPortalLink(request.accessToken)}><Clipboard size={15} />Copier le lien</button>{response && request.status !== "completed" ? <button className="button button-primary button-small" type="button" onClick={() => completeRequest(request.id)}><CheckCircle2 size={15} />Clôturer</button> : null}</div>
+            <div className="professional-row-copy"><strong>{request.subject}</strong><p>{request.supplierName} · {request.supplierEmail}</p><small>{product?.name || "Produit"}{request.dueDate ? ` · attendu le ${new Intl.DateTimeFormat("fr-FR").format(new Date(request.dueDate))}` : ""}{requestResponses.length ? ` · ${requestResponses.length} document${requestResponses.length > 1 ? "s" : ""}` : ""}</small>{requestResponses.map((response) => <a className="inline-link" href={response.documentUrl} target="_blank" rel="noreferrer" key={response.id}><ExternalLink size={14} />{response.documentName}</a>)}</div>
+            <div className="professional-row-actions"><button className="button button-secondary button-small" type="button" onClick={() => copyPortalLink(request.accessToken)}><Clipboard size={15} />Copier le lien</button>{requestResponses.length > 0 && request.status !== "completed" ? <button className="button button-primary button-small" type="button" onClick={() => completeRequest(request.id)}><CheckCircle2 size={15} />Clôturer</button> : null}</div>
           </article>;
         })}</div> : <div className="empty-state"><Link2 size={29} /><strong>Aucune demande</strong><p>Créez votre premier lien de collecte documentaire sécurisé.</p></div>}
       </section>
     </div>
   );
 }
-

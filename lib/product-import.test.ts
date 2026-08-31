@@ -14,10 +14,20 @@ describe("parseProductCsv", () => {
     expect(result.rows[0].manufacturer).toBe("ACME, SAS");
   });
 
+  it("accepte une cellule citée sur plusieurs lignes", () => {
+    const result = parseProductCsv('name,sku,manufacturer\n"Lampe\nMini",L-3,ACME');
+    expect(result.rows[0].name).toBe("Lampe\nMini");
+  });
+
+  it("écarte les SKU dupliqués dans le même fichier", () => {
+    const result = parseProductCsv("nom;sku\nLampe;ABC-1\nLampe bis;abc-1");
+    expect(result.rows).toHaveLength(1);
+    expect(result.errors[0].message).toContain("dupliqué");
+  });
+
   it("refuse un fichier sans SKU", () => {
     const result = parseProductCsv("nom;catégorie\nLampe;Éclairage");
     expect(result.rows).toHaveLength(0);
     expect(result.errors[0].message).toContain("SKU");
   });
 });
-

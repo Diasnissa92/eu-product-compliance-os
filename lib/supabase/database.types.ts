@@ -1217,6 +1217,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_incident_from_safety_gate: {
+        Args: { p_match_id: string; p_org_id: string }
+        Returns: Json
+      }
       accept_my_organization_invitations: { Args: never; Returns: number }
       add_requirement_comment: {
         Args: { p_body: string; p_product_requirement_id: string }
@@ -1259,6 +1263,15 @@ export type Database = {
           p_supplier_email: string
           p_supplier_name: string
           p_token: string
+        }
+        Returns: Json
+      }
+      sync_safety_gate_alerts: {
+        Args: {
+          p_alerts: Json
+          p_report_date: string
+          p_report_reference: string
+          p_secret: string
         }
         Returns: Json
       }

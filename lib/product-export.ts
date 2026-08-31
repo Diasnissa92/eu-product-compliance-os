@@ -8,7 +8,9 @@ const statusLabels: Record<Product["status"], string> = {
 };
 
 function csvCell(value: string | number) {
-  return `"${String(value).replaceAll('"', '""')}"`;
+  const raw = String(value);
+  const spreadsheetSafe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return `"${spreadsheetSafe.replaceAll('"', '""')}"`;
 }
 
 export function productsToCsv(products: Product[]) {
