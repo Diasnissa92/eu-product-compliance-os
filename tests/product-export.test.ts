@@ -29,4 +29,10 @@ describe("productsToCsv", () => {
     expect(csv).toContain('"À compléter"');
     expect(csv).toContain('"74%"');
   });
+
+  it("neutralise les formules de tableur injectées dans les données", () => {
+    const csv = productsToCsv([{ ...product, name: "=HYPERLINK(\"https://example.com\")" }]);
+    expect(csv).toContain("'=HYPERLINK");
+    expect(csv).not.toContain('"=HYPERLINK');
+  });
 });
