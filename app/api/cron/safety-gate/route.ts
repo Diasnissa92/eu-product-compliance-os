@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { isoDateFromEuropean, parseSafetyGateAlerts, parseSafetyGateReportList, safetyGateReportListUrl, type SafetyGateAlert } from "@/lib/safety-gate";
+import { readBearerRuntimeSecret } from "@/lib/runtime-secret";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
 export const runtime = "nodejs";
@@ -25,13 +26,24 @@ async function fetchOfficialXml(url: string) {
 }
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return NextResponse.json({ ok: false, error: "Synchronisation non configurée." }, { status: 503 });
-  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+  const cronSecret = readBearerRuntimeSecret(request.headers.get("authorization"));
+  if (!cronSecret) {
     return NextResponse.json({ ok: false, error: "Accès refusé." }, { status: 401 });
   }
 
   try {
+    const { url, publishableKey } = getSupabaseConfig();
+    const supabase = createClient<Database>(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: secretAccepted, error: secretError } = await supabase.rpc("verify_runtime_secret", {
+      p_name: "safety_gate_cron",
+      p_secret: cronSecret,
+    });
+    if (secretError) {
+      console.error("Safety Gate secret verification failed", secretError.code);
+      return NextResponse.json({ ok: false, error: "Synchronisation temporairement indisponible." }, { status: 503 });
+    }
+    if (!secretAccepted) return NextResponse.json({ ok: false, error: "Accès refusé." }, { status: 401 });
+
     const reports = parseSafetyGateReportList(await fetchOfficialXml(safetyGateReportListUrl), 2);
     if (!reports.length) throw new Error("Aucun rapport Safety Gate officiel exploitable.");
     const alertsByReference = new Map<string, SafetyGateAlert>();
@@ -39,8 +51,6 @@ export async function GET(request: Request) {
       for (const alert of parseSafetyGateAlerts(await fetchOfficialXml(report.url))) alertsByReference.set(alert.reference, alert);
     }
     const latest = reports[0];
-    const { url, publishableKey } = getSupabaseConfig();
-    const supabase = createClient<Database>(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await supabase.rpc("sync_safety_gate_alerts", {
       p_secret: cronSecret,
       p_report_reference: reports.map((report) => report.reference).join(", "),
