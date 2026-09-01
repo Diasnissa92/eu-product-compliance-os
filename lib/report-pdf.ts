@@ -17,6 +17,21 @@ export type RegulatoryReportPdfData = {
   verifiedDocuments: number;
   totalDocuments: number;
   nextDeadline: string;
+  engineVersion: string;
+  regulatoryAssessments: Array<{
+    regulation: string;
+    outcome: string;
+    rationale: string;
+    sourceReference: string;
+  }>;
+  regulatoryActions: Array<{
+    title: string;
+    regulation: string;
+    severity: string;
+    status: string;
+    owner: string;
+    dueDate: string;
+  }>;
   requirements: Array<{
     title: string;
     regulation: string;
@@ -259,7 +274,7 @@ export function createRegulatoryReportPdf(data: RegulatoryReportPdfData) {
     ["Organisation", data.organizationName],
     ["Édité le", data.generatedAt],
     ["Édité par", data.generatedBy],
-    ["Dernière mise à jour", data.updatedAt],
+    ["Moteur", data.engineVersion],
   ];
   metadata.forEach(([label, value], index) => {
     const x = MARGIN + index * ((PAGE_WIDTH - MARGIN * 2) / 4) + 12;
@@ -269,9 +284,9 @@ export function createRegulatoryReportPdf(data: RegulatoryReportPdfData) {
   y -= 92;
 
   const summaries = [
-    [`${data.closedRequirements}/${data.totalRequirements}`, "Exigences clôturées"],
+    [`${data.regulatoryAssessments.length}`, "Cadres évalués"],
+    [`${data.regulatoryActions.filter((action) => !["Terminée", "Écartée"].includes(action.status)).length}`, "Actions de qualification"],
     [`${data.verifiedDocuments}/${data.totalDocuments}`, "Documents vérifiés"],
-    [data.nextDeadline, "Prochaine échéance"],
   ];
   const cardWidth = (PAGE_WIDTH - MARGIN * 2 - 20) / 3;
   summaries.forEach(([value, label], index) => {
@@ -287,11 +302,45 @@ export function createRegulatoryReportPdf(data: RegulatoryReportPdfData) {
   addDetail("FABRICANT", data.manufacturer);
   addDetail("PAYS D’ORIGINE", data.originCountry);
   addDetail("MARCHÉS DE DESTINATION", data.destinationMarkets.join(", ") || "À préciser");
-  addDetail("RÉFÉRENTIELS IDENTIFIÉS", data.frameworks.join(" · ") || "À confirmer");
+  addDetail("RÉFÉRENTIELS MATÉRIALISÉS", data.frameworks.join(" · ") || "Aucun référentiel matérialisé");
 
-  addSection("02", "Diagnostic", "Checklist de conformité");
+  addSection("02", "Qualification", "Évaluation réglementaire versionnée");
+  operations.push(drawText(`Version du moteur : ${data.engineVersion}`, MARGIN, y, 8, true, GREEN));
+  y -= 20;
+  if (data.regulatoryAssessments.length === 0) {
+    addWrappedText("Aucune évaluation réglementaire n’est enregistrée pour cette version du moteur.", MARGIN, PAGE_WIDTH - MARGIN * 2, 10, false, MUTED);
+    y -= 12;
+  }
+  data.regulatoryAssessments.forEach((item, index) => {
+    ensureSpace(78);
+    operations.push(drawText(`${index + 1}. ${item.regulation} · ${item.outcome}`, MARGIN, y, 10, true));
+    y -= 15;
+    addWrappedText(item.rationale, MARGIN + 12, PAGE_WIDTH - MARGIN * 2 - 12, 8, false, MUTED, 11);
+    operations.push(drawText(`Source : ${item.sourceReference}`, MARGIN + 12, y, 8, false, GREEN));
+    y -= 18;
+    operations.push(strokeLine(MARGIN, y, PAGE_WIDTH - MARGIN, y));
+    y -= 12;
+  });
+
+  addSection("03", "Plan d’actions", "Revues et informations à traiter");
+  if (data.regulatoryActions.length === 0) {
+    addWrappedText("Aucune action réglementaire n’est enregistrée pour cette version du moteur.", MARGIN, PAGE_WIDTH - MARGIN * 2, 10, false, MUTED);
+    y -= 12;
+  }
+  data.regulatoryActions.forEach((action, index) => {
+    ensureSpace(64);
+    operations.push(drawText(`${index + 1}. ${action.title}`, MARGIN, y, 10, true));
+    y -= 15;
+    addWrappedText(`${action.regulation} · ${action.severity} · ${action.status}`, MARGIN + 12, PAGE_WIDTH - MARGIN * 2 - 12, 8, false, MUTED, 11);
+    operations.push(drawText(`Responsable : ${action.owner} · Échéance : ${action.dueDate}`, MARGIN + 12, y, 8, false, GREEN));
+    y -= 18;
+    operations.push(strokeLine(MARGIN, y, PAGE_WIDTH - MARGIN, y));
+    y -= 12;
+  });
+
+  addSection("04", "Exigences matérialisées", "Checklist de conformité");
   if (data.requirements.length === 0) {
-    addWrappedText("Aucune exigence n’est encore enregistrée.", MARGIN, PAGE_WIDTH - MARGIN * 2, 10, false, MUTED);
+    addWrappedText("Aucune exigence active n’est matérialisée dans la checklist. Cela ne signifie pas qu’aucun texte ne s’applique : voir la qualification ci-dessus.", MARGIN, PAGE_WIDTH - MARGIN * 2, 10, false, MUTED);
     y -= 12;
   }
   data.requirements.forEach((requirement, index) => {
@@ -305,7 +354,7 @@ export function createRegulatoryReportPdf(data: RegulatoryReportPdfData) {
     y -= 12;
   });
 
-  addSection("03", "Coffre de preuves", "Documents réglementaires");
+  addSection("05", "Coffre de preuves", "Documents réglementaires");
   if (data.documents.length === 0) {
     addWrappedText("Aucun document n’est encore enregistré.", MARGIN, PAGE_WIDTH - MARGIN * 2, 10, false, MUTED);
     y -= 12;
@@ -321,12 +370,12 @@ export function createRegulatoryReportPdf(data: RegulatoryReportPdfData) {
     y -= 12;
   });
 
-  ensureSpace(70);
-  operations.push(fillRect(MARGIN, y - 45, PAGE_WIDTH - MARGIN * 2, 54, SOFT));
+  ensureSpace(82);
+  operations.push(fillRect(MARGIN, y - 56, PAGE_WIDTH - MARGIN * 2, 66, SOFT));
   operations.push(drawText("Traçabilité protégée", MARGIN + 12, y - 10, 9, true));
   y -= 25;
   addWrappedText(
-    `Cette fiche est générée à partir des données accessibles à l’organisation ${data.organizationName}. Document de synthèse : ne constitue ni une certification, ni un avis juridique, ni la décision d’un organisme notifié.`,
+    `Cette fiche est générée à partir des données accessibles à l’organisation ${data.organizationName}. Les résultats de qualification décrivent une revue versionnée du dossier. Ils ne constituent ni une certification, ni un avis juridique, ni la décision d’un organisme notifié.`,
     MARGIN + 12,
     PAGE_WIDTH - MARGIN * 2 - 24,
     7,
