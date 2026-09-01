@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Share2 } from "lucide-react";
+import { Check, ScanSearch, Share2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { copyText } from "@/lib/client-actions";
 
@@ -22,6 +23,7 @@ export function ProductActions({ productId }: { productId: string }) {
 
   return (
     <div className="heading-actions">
+      <Link className="button button-primary" href={`/products/${productId}/regulatory`}><ScanSearch size={17}/>Évaluation réglementaire</Link>
       <button className="button button-secondary" type="button" onClick={() => void copyLink()}>
         {copied ? <Check size={17} /> : <Share2 size={17} />}
         {copied ? "Lien sécurisé copié" : "Partager la fiche"}
