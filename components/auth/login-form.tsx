@@ -27,7 +27,17 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     setMessage(undefined);
 
     if (!isSupabaseConfigured) {
-      setError("La connexion sera disponible dès que les variables Supabase seront ajoutées à Vercel.");
+      setError("Le service de connexion n’est pas configuré. Contactez l’administrateur de la plateforme.");
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || password.length < 12) {
+      setError(mode === "sign-up" ? "Utilisez une adresse e-mail valide et un mot de passe d’au moins 12 caractères." : "Adresse e-mail ou mot de passe incorrect.");
+      return;
+    }
+    if (mode === "sign-up" && fullName.trim().length < 2) {
+      setError("Renseignez votre nom complet.");
       return;
     }
 
@@ -35,7 +45,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     try {
       const supabase = createClient();
       if (mode === "sign-in") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
         if (signInError) throw signInError;
         router.replace("/dashboard");
         router.refresh();
@@ -43,7 +53,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       }
 
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: normalizedEmail,
         password,
         options: {
           data: { full_name: fullName.trim() },
@@ -56,7 +66,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
         router.refresh();
         return;
       }
-      setMessage("Compte créé. Consultez votre boîte e-mail pour confirmer votre adresse.");
+      setMessage("Compte créé. Consultez votre boîte e-mail pour confirmer votre adresse avant de vous connecter.");
     } catch (caughtError) {
       const detail = caughtError instanceof Error ? caughtError.message : "Le service de connexion est momentanément indisponible.";
       setError(detail === "Invalid login credentials" ? "Adresse e-mail ou mot de passe incorrect." : detail);
@@ -82,16 +92,15 @@ export function LoginForm({ initialError }: { initialError?: string }) {
       </div>
 
       <form className="auth-form" onSubmit={submit}>
-        {mode === "sign-up" ? <label className="field"><span>Nom complet</span><input autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Hugo Dias" required /></label> : null}
-        <label className="field"><span>Adresse e-mail</span><input autoComplete="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="vous@entreprise.fr" required /></label>
-        <PasswordField label="Mot de passe" autoComplete={mode === "sign-in" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8 caractères minimum" />
+        {mode === "sign-up" ? <label className="field"><span>Nom complet</span><input autoComplete="name" maxLength={160} value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Votre nom" required /></label> : null}
+        <label className="field"><span>Adresse e-mail</span><input autoComplete="email" maxLength={320} type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="vous@entreprise.fr" required /></label>
+        <PasswordField label="Mot de passe" autoComplete={mode === "sign-in" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="12 caractères minimum" />
         {mode === "sign-in" ? <Link className="auth-recovery-link" href="/forgot-password">Mot de passe oublié ?</Link> : null}
         {error ? <p className="form-feedback form-feedback-error" role="alert">{error}</p> : null}
         {message ? <p className="form-feedback form-feedback-success"><CheckCircle2 size={16} />{message}</p> : null}
         <button className="button button-primary button-full" type="submit" disabled={pending}>{pending ? "Chargement…" : mode === "sign-in" ? "Se connecter" : "Créer mon espace"}<ArrowRight size={17} /></button>
       </form>
 
-      <Link className="auth-demo-link" href="/dashboard">Continuer avec la démonstration</Link>
       <small className="auth-legal">Vos données sont isolées par organisation et protégées par des règles d’accès.</small>
     </div>
   );
