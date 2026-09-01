@@ -9,6 +9,7 @@ import {
   type RegulatoryProfile,
 } from "@/lib/regulatory-engine";
 import { createClient } from "@/lib/supabase/client";
+import type { Json } from "@/lib/supabase/phase3-database.types";
 
 const outcomeLabel = {
   applicable: "Applicable",
@@ -95,8 +96,11 @@ export function RegulatoryAssessmentWorkbench({ organizationId, productId, categ
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error("Session expirée.");
 
-      // @ts-expect-error Database types are regenerated after the Phase 3 migration is merged.
-      const { error: profileError } = await supabase.from("products").update({ regulatory_profile: profile }).eq("id", productId).eq("org_id", organizationId);
+      const persistedProfile = JSON.parse(JSON.stringify(profile)) as Json;
+      const { error: profileError } = await supabase.from("products")
+        .update({ regulatory_profile: persistedProfile })
+        .eq("id", productId)
+        .eq("org_id", organizationId);
       if (profileError) throw profileError;
 
       const assessmentRows = results.map((result) => ({
@@ -106,25 +110,23 @@ export function RegulatoryAssessmentWorkbench({ organizationId, productId, categ
         outcome: result.outcome,
         rationale: result.rationale,
         engine_version: REGULATORY_ENGINE_VERSION,
-        inputs: profile,
+        inputs: persistedProfile,
         source_url: result.sourceUrl,
         source_reference: result.sourceReference,
         assessed_by: user.id,
         assessed_at: new Date().toISOString(),
       }));
-      // @ts-expect-error Database types are regenerated after the Phase 3 migration is merged.
-      const { error: assessmentError } = await supabase.from("product_regulatory_assessments").upsert(assessmentRows, { onConflict: "product_id,regulation_code,engine_version" });
+      const { error: assessmentError } = await supabase.from("product_regulatory_assessments")
+        .upsert(assessmentRows, { onConflict: "product_id,regulation_code,engine_version" });
       if (assessmentError) throw assessmentError;
 
-      // Conserver l’état collaboratif d’une action déjà créée (assignation, échéance, clôture).
-      // @ts-expect-error Database types are regenerated after the Phase 3 migration is merged.
       const { data: existingActions, error: existingError } = await supabase.from("regulatory_action_items")
         .select("action_key,status,assignee_id,due_date")
         .eq("org_id", organizationId)
         .eq("product_id", productId)
         .eq("engine_version", REGULATORY_ENGINE_VERSION);
       if (existingError) throw existingError;
-      const existing = new Map((existingActions ?? []).map((item: { action_key: string; status: string; assignee_id: string | null; due_date: string | null }) => [item.action_key, item]));
+      const existing = new Map((existingActions ?? []).map((item) => [item.action_key, item]));
 
       const actionRows = actionPlan.map((action) => {
         const current = existing.get(action.actionKey);
@@ -147,8 +149,8 @@ export function RegulatoryAssessmentWorkbench({ organizationId, productId, categ
         };
       });
       if (actionRows.length) {
-        // @ts-expect-error Database types are regenerated after the Phase 3 migration is merged.
-        const { error: actionsError } = await supabase.from("regulatory_action_items").upsert(actionRows, { onConflict: "product_id,action_key,engine_version" });
+        const { error: actionsError } = await supabase.from("regulatory_action_items")
+          .upsert(actionRows, { onConflict: "product_id,action_key,engine_version" });
         if (actionsError) throw actionsError;
       }
 
