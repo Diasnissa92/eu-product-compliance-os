@@ -36,6 +36,7 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
 
       const suffix = crypto.randomUUID().slice(0, 6);
       const slug = `${slugify(cleanOrganization) || "organisation"}-${suffix}`;
+      // @ts-expect-error Phase 2 RPC is already deployed; generated DB types are refreshed at the release boundary.
       const { error: onboardingError } = await supabase.rpc("onboard_my_organization", {
         p_full_name: cleanName,
         p_organization_name: cleanOrganization,
