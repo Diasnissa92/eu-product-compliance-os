@@ -4,9 +4,11 @@ export type EcommerceListingInput = {
   manufacturerName: string;
   manufacturerPostalAddress: string;
   manufacturerElectronicAddress: string;
+  manufacturerElectronicAddressDirect: boolean;
   responsiblePersonName: string;
   responsiblePersonPostalAddress: string;
   responsiblePersonElectronicAddress: string;
+  responsiblePersonElectronicAddressDirect: boolean;
   warningsApplicable: boolean;
   warnings: string;
   warningsNotApplicableReason: string;
@@ -41,27 +43,36 @@ type ConditionalCheck = {
 
 const article19 = "Règlement (UE) 2023/988, article 19";
 const checks: ConditionalCheck[] = [
-  { id: "title", label: "Identification claire du produit", detail: "Le titre doit permettre d’identifier le produit vendu.", legalReference: article19, weight: 6 },
-  { id: "productIdentifier", label: "Type, lot ou autre identifiant", detail: "Un identifiant traçable doit être visible dans l’offre.", legalReference: article19, weight: 12 },
-  { id: "manufacturerName", label: "Nom du fabricant", detail: "Le nom, la raison sociale ou la marque du fabricant doit apparaître.", legalReference: article19, weight: 9 },
-  { id: "manufacturerPostalAddress", label: "Adresse postale du fabricant", detail: "L’adresse postale du fabricant doit être visible avant l’achat.", legalReference: article19, weight: 10 },
-  { id: "manufacturerElectronicAddress", label: "Adresse électronique du fabricant", detail: "Une adresse électronique permettant de contacter le fabricant doit être indiquée.", legalReference: article19, weight: 9 },
+  { id: "title", label: "Type / désignation du produit", detail: "L’offre doit indiquer le type du produit de façon à permettre son identification.", legalReference: article19, weight: 6 },
+  { id: "productIdentifier", label: "Autre identifiant produit", detail: "Une référence, un modèle, un lot ou un autre identifiant permettant la traçabilité doit être visible.", legalReference: article19, weight: 12 },
+  { id: "manufacturerName", label: "Nom du fabricant", detail: "Le nom, la raison sociale ou la marque enregistrée du fabricant doit apparaître.", legalReference: article19, weight: 9 },
+  { id: "manufacturerPostalAddress", label: "Adresse postale du fabricant", detail: "L’adresse postale à laquelle le fabricant peut être contacté doit être visible avant l’achat.", legalReference: article19, weight: 10 },
+  { id: "manufacturerElectronicAddress", label: "Adresse électronique du fabricant", detail: "Une adresse électronique permettant un contact direct doit être indiquée. Un site web statique ne suffit pas.", legalReference: article19, weight: 9 },
   { id: "responsiblePersonName", label: "Responsable dans l’Union européenne", detail: "Requis lorsque le fabricant n’est pas établi dans l’Union.", legalReference: article19, weight: 8, requiredWhen: "manufacturerOutsideEu" },
   { id: "responsiblePersonPostalAddress", label: "Adresse postale du responsable UE", detail: "Requise lorsque le fabricant n’est pas établi dans l’Union.", legalReference: article19, weight: 8, requiredWhen: "manufacturerOutsideEu" },
-  { id: "responsiblePersonElectronicAddress", label: "Adresse électronique du responsable UE", detail: "Requise lorsque le fabricant n’est pas établi dans l’Union.", legalReference: article19, weight: 8, requiredWhen: "manufacturerOutsideEu" },
-  { id: "warnings", label: "Avertissements et informations de sécurité", detail: "Toute information de sécurité applicable doit être visible avant l’achat.", legalReference: article19, weight: 12, requiredWhen: "warningsApplicable" },
-  { id: "warningsNotApplicableReason", label: "Justification de non-applicabilité", detail: "Si aucun avertissement n’est applicable, cette conclusion doit être justifiée dans le dossier.", legalReference: "Revue interne de l’analyse de risques", weight: 6, requiredWhen: "warningsNotApplicable" },
-  { id: "language", label: "Langue du marché ciblé", detail: "Les avertissements et informations de sécurité doivent être compréhensibles sur le marché ciblé.", legalReference: article19, weight: 6 },
+  { id: "responsiblePersonElectronicAddress", label: "Adresse électronique du responsable UE", detail: "Requise lorsque le fabricant n’est pas établi dans l’Union et doit permettre un contact direct.", legalReference: article19, weight: 8, requiredWhen: "manufacturerOutsideEu" },
+  { id: "warnings", label: "Avertissements et informations de sécurité", detail: "Toute information de sécurité applicable doit être clairement et visiblement indiquée dans l’offre.", legalReference: article19, weight: 12, requiredWhen: "warningsApplicable" },
+  { id: "warningsNotApplicableReason", label: "Justification de non-applicabilité", detail: "Si aucune information de sécurité spécifique n’est applicable, cette conclusion doit rester justifiée dans le dossier.", legalReference: "Revue interne de l’analyse de risques et des textes applicables", weight: 6, requiredWhen: "warningsNotApplicable" },
+  { id: "language", label: "Langue des informations de sécurité", detail: "Lorsqu’elles sont requises, les informations de sécurité doivent être dans une langue facilement compréhensible par les consommateurs du marché concerné.", legalReference: article19, weight: 6, requiredWhen: "warningsApplicable" },
   { id: "traceabilityImage", label: "Image du produit", detail: "L’offre à distance doit inclure une image permettant d’identifier le produit.", legalReference: article19, weight: 12 },
 ];
 
+function validElectronicAddress(value: string, directWebContactConfirmed: boolean) {
+  const trimmed = value.trim();
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) return true;
+  return /^https:\/\/[^\s]+$/i.test(trimmed) && directWebContactConfirmed;
+}
+
 function hasValue(input: EcommerceListingInput, id: keyof EcommerceListingInput) {
+  if (id === "manufacturerElectronicAddress") {
+    return validElectronicAddress(input.manufacturerElectronicAddress, input.manufacturerElectronicAddressDirect);
+  }
+  if (id === "responsiblePersonElectronicAddress") {
+    return validElectronicAddress(input.responsiblePersonElectronicAddress, input.responsiblePersonElectronicAddressDirect);
+  }
   const value = input[id];
   if (typeof value === "boolean") return value;
   const trimmed = value.trim();
-  if (id === "manufacturerElectronicAddress" || id === "responsiblePersonElectronicAddress") {
-    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed) || /^https:\/\/[^\s]+$/i.test(trimmed);
-  }
   if (id === "manufacturerPostalAddress" || id === "responsiblePersonPostalAddress" || id === "warningsNotApplicableReason") return trimmed.length >= 8;
   return trimmed.length > 1;
 }
@@ -89,6 +100,6 @@ export function auditEcommerceListing(input: EcommerceListingInput, manufacturer
     score,
     status,
     findings,
-    summary: failures === 0 ? "Les mentions essentielles sont présentes. Une validation humaine reste nécessaire." : `${failures} mention${failures > 1 ? "s" : ""} obligatoire${failures > 1 ? "s" : ""} à compléter avant publication.`,
+    summary: failures === 0 ? "Les mentions contrôlées sont présentes. Une validation humaine des informations et des textes applicables reste nécessaire." : `${failures} mention${failures > 1 ? "s" : ""} obligatoire${failures > 1 ? "s" : ""} à compléter avant publication.`,
   };
 }
