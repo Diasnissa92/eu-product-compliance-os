@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/supabase/phase3-database.types";
 import { supabaseUrl } from "@/lib/supabase/config";
 
 export function createAdminClient() {

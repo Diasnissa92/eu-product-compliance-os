@@ -45,7 +45,7 @@ describe("regulatory report", () => {
     expect(documentStatusCopy.expired).toBe("Expiré");
   });
 
-  it("creates a downloadable PDF with the regulatory report data", async () => {
+  it("creates a downloadable PDF with versioned qualification and action data", async () => {
     const pdf = createRegulatoryReportPdf({
       productName: "Panneau mural BELLARO",
       sku: "BEL-PM-001",
@@ -53,27 +53,38 @@ describe("regulatory report", () => {
       manufacturer: "Fabricant OEM BELLARO — à confirmer",
       originCountry: "Chine",
       destinationMarkets: ["France"],
-      frameworks: ["EU-2024-3110"],
+      frameworks: [],
       organizationName: "BATIDIAS",
-      generatedAt: "19 août 2026 à 14:20",
+      generatedAt: "1 septembre 2026 à 15:10",
       generatedBy: "Hugo Dias",
-      updatedAt: "19 août 2026",
-      score: 74,
-      status: "À compléter",
-      closedRequirements: 4,
-      totalRequirements: 8,
+      updatedAt: "1 septembre 2026",
+      score: 0,
+      status: "Brouillon",
+      closedRequirements: 0,
+      totalRequirements: 0,
       verifiedDocuments: 2,
       totalDocuments: 2,
       nextDeadline: "Aucune",
-      requirements: [
+      engineVersion: "eu-core-2026-09-01-v2",
+      regulatoryAssessments: [
         {
-          title: "Déclaration des performances et de conformité",
-          regulation: "EU-2024-3110",
-          severity: "Bloquant",
-          status: "Validée",
-          evidence: "IMG_0101.jpg",
+          regulation: "EU 2024/3110",
+          outcome: "Revue humaine requise",
+          rationale: "La famille de produit et les spécifications techniques pertinentes doivent être confirmées.",
+          sourceReference: "Articles 1 à 3",
         },
       ],
+      regulatoryActions: [
+        {
+          title: "Valider le champ d’application — Règlement Produits de Construction",
+          regulation: "EU 2024/3110",
+          severity: "Élevé",
+          status: "Ouverte",
+          owner: "Non assigné",
+          dueDate: "Non définie",
+        },
+      ],
+      requirements: [],
       documents: [
         {
           name: "IMG_0101.jpg",
@@ -91,6 +102,8 @@ describe("regulatory report", () => {
     expect(contents.startsWith("%PDF-1.4")).toBe(true);
     expect(contents).toContain("/Type /Catalog");
     expect(contents).toContain("Panneau mural BELLARO");
+    expect(contents).toContain("eu-core-2026-09-01-v2");
+    expect(contents).toContain("EU 2024/3110");
     expect(contents.endsWith("%%EOF")).toBe(true);
     expect(regulatoryReportPdfFilename("Panneau mural BELLARO")).toBe("fiche-reglementaire-panneau-mural-bellaro.pdf");
   });
