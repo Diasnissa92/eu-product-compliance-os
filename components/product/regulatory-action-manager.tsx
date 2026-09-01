@@ -37,7 +37,6 @@ export function RegulatoryActionManager({ organizationId, productId, actions, me
     setError(undefined);
     try {
       const supabase = createClient();
-      // @ts-expect-error Generated database types will be refreshed after the Phase 3 migration.
       const { error: updateError } = await supabase.from("regulatory_action_items")
         .update(patch)
         .eq("id", id)

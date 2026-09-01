@@ -4,12 +4,61 @@ export type { Json } from "@/lib/supabase/database.types";
 
 type BaseTables = BaseDatabase["public"]["Tables"];
 type BaseProducts = BaseTables["products"];
+type BaseFunctions = BaseDatabase["public"]["Functions"];
 
 type Phase3Products = {
   Row: BaseProducts["Row"] & { regulatory_profile: Json };
   Insert: BaseProducts["Insert"] & { regulatory_profile?: Json };
   Update: BaseProducts["Update"] & { regulatory_profile?: Json };
   Relationships: BaseProducts["Relationships"];
+};
+
+type OrganizationSubscriptions = {
+  Row: {
+    cancel_at_period_end: boolean;
+    created_at: string;
+    current_period_end: string | null;
+    org_id: string;
+    plan_code: string;
+    status: string;
+    stripe_customer_id: string | null;
+    stripe_price_id: string | null;
+    stripe_subscription_id: string | null;
+    updated_at: string;
+  };
+  Insert: {
+    cancel_at_period_end?: boolean;
+    created_at?: string;
+    current_period_end?: string | null;
+    org_id: string;
+    plan_code?: string;
+    status?: string;
+    stripe_customer_id?: string | null;
+    stripe_price_id?: string | null;
+    stripe_subscription_id?: string | null;
+    updated_at?: string;
+  };
+  Update: {
+    cancel_at_period_end?: boolean;
+    created_at?: string;
+    current_period_end?: string | null;
+    org_id?: string;
+    plan_code?: string;
+    status?: string;
+    stripe_customer_id?: string | null;
+    stripe_price_id?: string | null;
+    stripe_subscription_id?: string | null;
+    updated_at?: string;
+  };
+  Relationships: [
+    {
+      foreignKeyName: "organization_subscriptions_org_id_fkey";
+      columns: ["org_id"];
+      isOneToOne: true;
+      referencedRelation: "organizations";
+      referencedColumns: ["id"];
+    },
+  ];
 };
 
 type ProductRegulatoryAssessments = {
@@ -174,11 +223,23 @@ type RegulatoryActionItems = {
 };
 
 export type Database = Omit<BaseDatabase, "public"> & {
-  public: Omit<BaseDatabase["public"], "Tables"> & {
-    Tables: Omit<BaseTables, "products" | "product_regulatory_assessments" | "regulatory_action_items"> & {
+  public: Omit<BaseDatabase["public"], "Tables" | "Functions"> & {
+    Tables: Omit<BaseTables, "organization_subscriptions" | "products" | "product_regulatory_assessments" | "regulatory_action_items"> & {
+      organization_subscriptions: OrganizationSubscriptions;
       products: Phase3Products;
       product_regulatory_assessments: ProductRegulatoryAssessments;
       regulatory_action_items: RegulatoryActionItems;
+    };
+    Functions: BaseFunctions & {
+      onboard_my_organization: {
+        Args: {
+          p_country_code: string;
+          p_full_name: string;
+          p_organization_name: string;
+          p_slug: string;
+        };
+        Returns: Json;
+      };
     };
   };
 };

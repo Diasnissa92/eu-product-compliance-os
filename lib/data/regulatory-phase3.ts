@@ -56,6 +56,62 @@ export type ProductJourneyState = {
   readyForSynthesis: boolean;
 };
 
+function parseAssessmentOutcome(value: string): StoredRegulatoryAssessment["outcome"] {
+  switch (value) {
+    case "applicable":
+      return "applicable";
+    case "not_applicable":
+      return "not_applicable";
+    case "needs_information":
+      return "needs_information";
+    case "human_review":
+      return "human_review";
+    default:
+      throw new Error(`Conclusion réglementaire inconnue : ${value}`);
+  }
+}
+
+function parseActionKind(value: string): StoredRegulatoryAction["kind"] {
+  switch (value) {
+    case "information":
+      return "information";
+    case "review":
+      return "review";
+    case "evidence":
+      return "evidence";
+    default:
+      throw new Error(`Type d’action réglementaire inconnu : ${value}`);
+  }
+}
+
+function parseActionSeverity(value: string): StoredRegulatoryAction["severity"] {
+  switch (value) {
+    case "medium":
+      return "medium";
+    case "high":
+      return "high";
+    case "blocking":
+      return "blocking";
+    default:
+      throw new Error(`Niveau d’action réglementaire inconnu : ${value}`);
+  }
+}
+
+function parseActionStatus(value: string): StoredRegulatoryAction["status"] {
+  switch (value) {
+    case "open":
+      return "open";
+    case "in_progress":
+      return "in_progress";
+    case "done":
+      return "done";
+    case "dismissed":
+      return "dismissed";
+    default:
+      throw new Error(`Statut d’action réglementaire inconnu : ${value}`);
+  }
+}
+
 export async function getProductRegulatorySnapshot(workspace: WorkspaceContext, productId: string): Promise<ProductRegulatorySnapshot> {
   if (workspace.mode !== "authenticated" || !workspace.organizationId) {
     return {
@@ -70,14 +126,12 @@ export async function getProductRegulatorySnapshot(workspace: WorkspaceContext, 
   }
 
   const supabase = await createClient();
-  // @ts-expect-error Generated database types will be refreshed after the Phase 3 migration.
   const assessmentsPromise = supabase.from("product_regulatory_assessments")
     .select("regulation_code,outcome,rationale,source_url,source_reference,assessed_at")
     .eq("org_id", workspace.organizationId)
     .eq("product_id", productId)
     .eq("engine_version", REGULATORY_ENGINE_VERSION)
     .order("assessed_at", { ascending: false });
-  // @ts-expect-error Generated database types will be refreshed after the Phase 3 migration.
   const actionsPromise = supabase.from("regulatory_action_items")
     .select("id,action_key,regulation_code,title,kind,severity,status,source_url,source_reference,assignee_id,due_date")
     .eq("org_id", workspace.organizationId)
@@ -86,7 +140,6 @@ export async function getProductRegulatorySnapshot(workspace: WorkspaceContext, 
     .order("created_at", { ascending: true });
   const ecommercePromise = supabase.from("ecommerce_audits").select("id", { count: "exact", head: true }).eq("org_id", workspace.organizationId).eq("product_id", productId);
   const supplierPromise = supabase.from("supplier_requests").select("id", { count: "exact", head: true }).eq("org_id", workspace.organizationId).eq("product_id", productId);
-  // @ts-expect-error regulatory_profile is a Phase 2 column pending regenerated local types.
   const productPromise = supabase.from("products").select("regulatory_profile,dpp_status").eq("org_id", workspace.organizationId).eq("id", productId).maybeSingle();
 
   const [assessmentsResult, actionsResult, ecommerceResult, supplierResult, productResult] = await Promise.all([
@@ -102,41 +155,22 @@ export async function getProductRegulatorySnapshot(workspace: WorkspaceContext, 
 
   return {
     engineVersion: REGULATORY_ENGINE_VERSION,
-    assessments: (assessmentsResult.data ?? []).map((row: {
-      regulation_code: string;
-      outcome: StoredRegulatoryAssessment["outcome"];
-      rationale: string;
-      source_url: string;
-      source_reference: string;
-      assessed_at: string;
-    }) => ({
+    assessments: (assessmentsResult.data ?? []).map((row) => ({
       regulationCode: row.regulation_code,
-      outcome: row.outcome,
+      outcome: parseAssessmentOutcome(row.outcome),
       rationale: row.rationale,
       sourceUrl: row.source_url,
-      sourceReference: row.source_reference,
+      sourceReference: row.source_reference ?? "Référence officielle non précisée",
       assessedAt: row.assessed_at,
     })),
-    actions: (actionsResult.data ?? []).map((row: {
-      id: string;
-      action_key: string;
-      regulation_code: string;
-      title: string;
-      kind: StoredRegulatoryAction["kind"];
-      severity: StoredRegulatoryAction["severity"];
-      status: StoredRegulatoryAction["status"];
-      source_url: string;
-      source_reference: string;
-      assignee_id: string | null;
-      due_date: string | null;
-    }) => ({
+    actions: (actionsResult.data ?? []).map((row) => ({
       id: row.id,
       actionKey: row.action_key,
       regulationCode: row.regulation_code,
       title: row.title,
-      kind: row.kind,
-      severity: row.severity,
-      status: row.status,
+      kind: parseActionKind(row.kind),
+      severity: parseActionSeverity(row.severity),
+      status: parseActionStatus(row.status),
       sourceUrl: row.source_url,
       sourceReference: row.source_reference,
       assigneeId: row.assignee_id ?? undefined,

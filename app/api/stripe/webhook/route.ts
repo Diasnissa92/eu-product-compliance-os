@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
     const customerId = stringValue(object.customer);
     const subscriptionId = stringValue(object.subscription);
     const planCode = object.metadata?.plan_code ?? "free";
-    // @ts-expect-error Phase 2 table exists in production; generated types are refreshed after merge.
     const { error } = await admin.from("organization_subscriptions").update({ stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, plan_code: planCode, updated_at: new Date().toISOString() }).eq("org_id", orgId);
     if (error) return NextResponse.json({ error: "Subscription persistence failed" }, { status: 500 });
   }
@@ -41,7 +40,6 @@ export async function POST(request: NextRequest) {
       cancel_at_period_end: object.cancel_at_period_end === true,
       updated_at: new Date().toISOString(),
     };
-    // @ts-expect-error Phase 2 table exists in production; generated types are refreshed after merge.
     const { error } = await admin.from("organization_subscriptions").update(update).eq("org_id", orgId);
     if (error) return NextResponse.json({ error: "Subscription persistence failed" }, { status: 500 });
   }

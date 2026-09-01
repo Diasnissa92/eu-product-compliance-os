@@ -22,6 +22,19 @@ function mapSeverity(requirementType: string, mandatory: boolean): RequirementSe
   return "medium";
 }
 
+function parseRegulatorySeverity(value: string): RequirementSeverity {
+  switch (value) {
+    case "medium":
+      return "medium";
+    case "high":
+      return "high";
+    case "blocking":
+      return "blocking";
+    default:
+      throw new Error(`Niveau d’action réglementaire inconnu : ${value}`);
+  }
+}
+
 export async function getWorkspaceActions(workspace: WorkspaceContext) {
   if (workspace.mode !== "authenticated" || !workspace.organizationId) {
     return buildComplianceActions(actionSourcesFromProducts(demoProducts));
@@ -36,7 +49,6 @@ export async function getWorkspaceActions(workspace: WorkspaceContext) {
     .neq("products.status", "archived")
     .order("due_date", { ascending: true, nullsFirst: false });
 
-  // @ts-expect-error Generated database types will be refreshed after the Phase 3 migration.
   const regulatoryPromise = supabase.from("regulatory_action_items")
     .select("id,title,regulation_code,severity,status,assignee_id,due_date,product_id,products!inner(id,name,sku,status)")
     .eq("org_id", workspace.organizationId)
@@ -76,17 +88,7 @@ export async function getWorkspaceActions(workspace: WorkspaceContext) {
     requirementId: row.id,
   }));
 
-  const regulatorySources: ComplianceActionSource[] = regulatoryRows.map((row: {
-    id: string;
-    title: string;
-    regulation_code: string;
-    severity: RequirementSeverity;
-    status: string;
-    assignee_id: string | null;
-    due_date: string | null;
-    product_id: string;
-    products: { id: string; name: string; sku: string | null; status: string };
-  }) => ({
+  const regulatorySources: ComplianceActionSource[] = regulatoryRows.map((row) => ({
     id: row.id,
     productId: row.product_id,
     productName: row.products.name,
@@ -94,7 +96,7 @@ export async function getWorkspaceActions(workspace: WorkspaceContext) {
     title: row.title,
     regulation: row.regulation_code,
     status: row.status === "done" ? "verified" : row.status === "dismissed" ? "not-applicable" : "pending",
-    severity: row.severity,
+    severity: parseRegulatorySeverity(row.severity),
     assigneeId: row.assignee_id ?? undefined,
     owner: row.assignee_id ? names.get(row.assignee_id) : undefined,
     dueDateValue: row.due_date ?? undefined,
