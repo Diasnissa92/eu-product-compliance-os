@@ -14,6 +14,8 @@ export type ComplianceActionSource = {
   assigneeId?: string;
   owner?: string;
   dueDateValue?: string;
+  requirementId?: string;
+  actionHref?: string;
 };
 
 function utcDay(value: Date) {
@@ -46,6 +48,7 @@ export function actionSourcesFromProducts(products: Product[]): ComplianceAction
     assigneeId: requirement.assigneeId,
     owner: requirement.owner,
     dueDateValue: requirement.dueDateValue,
+    requirementId: requirement.id,
   })));
 }
 
@@ -70,7 +73,7 @@ export function buildComplianceActions(sources: ComplianceActionSource[], now = 
       productId: source.productId,
       productName: source.productName,
       productSku: source.productSku,
-      requirementId: source.id,
+      requirementId: source.requirementId ?? source.id,
       title: source.title,
       regulation: source.regulation,
       status: source.status,
@@ -81,7 +84,7 @@ export function buildComplianceActions(sources: ComplianceActionSource[], now = 
       dueDateValue: source.dueDateValue,
       daysRemaining: remaining,
       priority,
-      actionHref: `/products/${encodeURIComponent(source.productId)}?requirement=${encodeURIComponent(source.id)}#requirement-${encodeURIComponent(source.id)}`,
+      actionHref: source.actionHref ?? `/products/${encodeURIComponent(source.productId)}?requirement=${encodeURIComponent(source.requirementId ?? source.id)}#requirement-${encodeURIComponent(source.requirementId ?? source.id)}`,
     }];
   }).toSorted((left, right) => {
     const priority = priorityOrder[left.priority] - priorityOrder[right.priority];
