@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 import { ComplianceRing } from "@/components/dashboard/compliance-ring";
 import { DocumentVault } from "@/components/product/document-vault";
 import { ProductActions } from "@/components/product/product-actions";
+import { ProductComplianceJourney } from "@/components/product/product-compliance-journey";
 import { ProductInformationEditor } from "@/components/product/product-information-editor";
 import { RequirementChecklist } from "@/components/product/requirement-checklist";
 import { ProductVisual } from "@/components/product-visual";
@@ -24,6 +25,7 @@ import { StatusPill } from "@/components/status-pill";
 import { countOpenActions } from "@/lib/compliance";
 import { getWorkspaceContext } from "@/lib/auth/workspace";
 import { getWorkspaceProduct } from "@/lib/data/products";
+import { buildProductJourney, getProductRegulatorySnapshot } from "@/lib/data/regulatory-phase3";
 import { getWorkspaceTeam } from "@/lib/data/team";
 import { complianceStatusCopy } from "@/lib/status";
 
@@ -37,13 +39,15 @@ export default async function ProductDetailPage({
   const { productId } = await params;
   const query = await searchParams;
   const workspace = await getWorkspaceContext();
-  const [product, team] = await Promise.all([
+  const [product, team, regulatorySnapshot] = await Promise.all([
     getWorkspaceProduct(workspace, productId),
     getWorkspaceTeam(workspace),
+    getProductRegulatorySnapshot(workspace, productId),
   ]);
   if (!product) notFound();
 
   const openActions = countOpenActions(product.requirements);
+  const journey = buildProductJourney(product, regulatorySnapshot);
   const persistence = workspace.mode === "authenticated" && workspace.organizationId
     ? { organizationId: workspace.organizationId, productId: product.id }
     : undefined;
@@ -67,13 +71,15 @@ export default async function ProductDetailPage({
       </section>
 
       {query.created === "1" ? <div className="inline-message product-page-message" aria-live="polite"><CircleCheckBig size={16} />Le dossier produit a bien été créé.</div> : null}
-      {query.setup === "partial" ? <div className="inline-message inline-message-error product-page-message" role="alert"><ShieldAlert size={16} />Le produit est enregistré, mais sa checklist n’a pas pu être générée. Le dossier reste accessible et aucun doublon ne sera créé.</div> : null}
+      {query.setup === "partial" ? <div className="inline-message inline-message-error product-page-message" role="alert"><ShieldAlert size={16} />Le produit est enregistré, mais aucun référentiel actuellement applicable n’a pu être matérialisé automatiquement. Lancez la qualification réglementaire pour poursuivre sans inventer de checklist.</div> : null}
 
       <section className={`status-banner banner-${product.status}`}>
         <span className="banner-icon">{product.status === "compliant" ? <CircleCheckBig size={22} /> : <ShieldAlert size={22} />}</span>
         <div><strong>{complianceStatusCopy[product.status].label}</strong><p>{complianceStatusCopy[product.status].description}</p></div>
-        {openActions > 0 ? <span className="banner-action-count">{openActions} action{openActions > 1 ? "s" : ""} ouverte{openActions > 1 ? "s" : ""}</span> : <span className="banner-action-count">Dossier à jour</span>}
+        {openActions > 0 ? <span className="banner-action-count">{openActions} action{openActions > 1 ? "s" : ""} de checklist ouverte{openActions > 1 ? "s" : ""}</span> : <span className="banner-action-count">Checklist sans action ouverte</span>}
       </section>
+
+      <ProductComplianceJourney journey={journey} />
 
       <nav className="detail-tabs" aria-label="Sections de la fiche produit">
         <a href="#overview">Vue d’ensemble</a>
@@ -96,7 +102,7 @@ export default async function ProductDetailPage({
 
           <section className="panel detail-section" id="requirements">
             <div className="panel-heading panel-heading-spaced">
-              <div><span className="eyebrow">Diagnostic dynamique</span><h2>Checklist de conformité</h2></div>
+              <div><span className="eyebrow">Exigences matérialisées</span><h2>Checklist de conformité</h2><p>Cette liste ne contient que les exigences effectivement enregistrées dans le référentiel actif. La qualification réglementaire reste séparée tant que l’applicabilité n’est pas confirmée.</p></div>
               <span className="section-meta">{product.requirements.length - openActions}/{product.requirements.length} exigences clôturées</span>
             </div>
             <RequirementChecklist
@@ -145,10 +151,10 @@ export default async function ProductDetailPage({
             <span className="eyebrow">Score du dossier</span>
             <ComplianceRing value={product.score} size={148} />
             <strong>{product.score >= 90 ? "Excellent niveau de preuve" : product.score >= 70 ? "Dossier à consolider" : "Risque élevé"}</strong>
-            <p>Calculé à partir du niveau de criticité et de l’état des preuves.</p>
+            <p>Calculé uniquement à partir des exigences matérialisées et de l’état des preuves. Il ne mesure pas à lui seul la conformité juridique globale.</p>
             <div className="score-breakdown">
               <span><Check size={15} />{product.requirements.length - openActions} exigences clôturées</span>
-              <span><Clock3 size={15} />{openActions} actions ouvertes</span>
+              <span><Clock3 size={15} />{openActions} actions de checklist ouvertes</span>
               <span><FileCheck2 size={15} />{product.documents.length} preuves enregistrées</span>
             </div>
           </section>
@@ -160,8 +166,8 @@ export default async function ProductDetailPage({
 
           <section className="panel dossier-panel">
             <span className="eyebrow">Fiche réglementaire</span>
-            <h3>Un dossier prêt à partager</h3>
-            <p>Générez une vue synthétique des preuves et exigences enregistrées.</p>
+            <h3>Une synthèse traçable du dossier</h3>
+            <p>Prévisualisez les preuves, exigences et conclusions de qualification enregistrées. La fiche reste un document de synthèse, pas une certification.</p>
             <Link className="button button-dark button-full" href={`/products/${product.id}/report`}>Prévisualiser la fiche <ArrowRight size={16} /></Link>
           </section>
         </aside>
