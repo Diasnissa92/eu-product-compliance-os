@@ -5,14 +5,23 @@ import { getWorkspaceContext } from "@/lib/auth/workspace";
 import { getBillingReadiness } from "@/lib/billing";
 import { createClient } from "@/lib/supabase/server";
 
+type SubscriptionRow = {
+  plan_code: string;
+  status: string;
+  stripe_customer_id: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+};
+
 export const metadata = { title: "Abonnement · EU Product Compliance OS" };
 
 export default async function BillingPage() {
   const workspace = await getWorkspaceContext();
   if (workspace.mode !== "authenticated" || !workspace.organizationId) redirect("/login");
   const supabase = await createClient();
-  // @ts-expect-error Phase 2 table exists in production; generated types are refreshed after merge.
-  const { data: subscription } = await supabase.from("organization_subscriptions").select("plan_code,status,stripe_customer_id,current_period_end,cancel_at_period_end").eq("org_id", workspace.organizationId).maybeSingle();
+  // @ts-expect-error Phase 2 table exists in production; generated types are refreshed separately.
+  const { data: rawSubscription } = await supabase.from("organization_subscriptions").select("plan_code,status,stripe_customer_id,current_period_end,cancel_at_period_end").eq("org_id", workspace.organizationId).maybeSingle();
+  const subscription = rawSubscription as SubscriptionRow | null;
   const readiness = getBillingReadiness();
   return <main>
     <section className="page-heading"><div><span className="eyebrow">Compte organisation</span><h1>Abonnement et facturation</h1><p>L’état affiché provient de la base synchronisée par webhook Stripe. Aucune donnée brute de carte n’est stockée par UE Conformité.</p></div><span className="heading-symbol heading-symbol-blue"><CreditCard size={25}/></span></section>
