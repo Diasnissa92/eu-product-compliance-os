@@ -3,6 +3,7 @@ import "server-only";
 import type { WorkspaceContext } from "@/lib/auth/workspace";
 import { actionSourcesFromProducts, buildComplianceActions, type ComplianceActionSource } from "@/lib/actions";
 import { products as demoProducts } from "@/lib/demo-data";
+import { REGULATORY_ENGINE_VERSION } from "@/lib/regulatory-engine";
 import { createClient } from "@/lib/supabase/server";
 import type { RequirementSeverity, RequirementStatus } from "@/lib/types";
 
@@ -27,7 +28,7 @@ export async function getWorkspaceActions(workspace: WorkspaceContext) {
   }
 
   const supabase = await createClient();
-  const { data: rows, error } = await supabase
+  const requirementsPromise = supabase
     .from("product_requirements")
     .select("id, status, assigned_to, due_date, product_id, products!inner(id, name, sku, status), requirements!inner(title, requirement_type, mandatory, regulations!inner(code))")
     .eq("org_id", workspace.organizationId)
@@ -35,16 +36,32 @@ export async function getWorkspaceActions(workspace: WorkspaceContext) {
     .neq("products.status", "archived")
     .order("due_date", { ascending: true, nullsFirst: false });
 
-  if (error) throw new Error(`Impossible de charger les actions : ${error.message}`);
+  // @ts-expect-error Generated database types will be refreshed after the Phase 3 migration.
+  const regulatoryPromise = supabase.from("regulatory_action_items")
+    .select("id,title,regulation_code,severity,status,assignee_id,due_date,product_id,products!inner(id,name,sku,status)")
+    .eq("org_id", workspace.organizationId)
+    .eq("engine_version", REGULATORY_ENGINE_VERSION)
+    .in("status", ["open", "in_progress"])
+    .neq("products.status", "archived")
+    .order("due_date", { ascending: true, nullsFirst: false });
 
-  const assigneeIds = [...new Set((rows ?? []).map((row) => row.assigned_to).filter((value): value is string => Boolean(value)))];
+  const [requirementsResult, regulatoryResult] = await Promise.all([requirementsPromise, regulatoryPromise]);
+  if (requirementsResult.error) throw new Error(`Impossible de charger les actions : ${requirementsResult.error.message}`);
+  if (regulatoryResult.error) throw new Error(`Impossible de charger les actions réglementaires : ${regulatoryResult.error.message}`);
+
+  const requirementRows = requirementsResult.data ?? [];
+  const regulatoryRows = regulatoryResult.data ?? [];
+  const assigneeIds = [...new Set([
+    ...requirementRows.map((row) => row.assigned_to),
+    ...regulatoryRows.map((row: { assignee_id: string | null }) => row.assignee_id),
+  ].filter((value): value is string => Boolean(value)))];
   const { data: profiles, error: profilesError } = assigneeIds.length
     ? await supabase.from("profiles").select("id, full_name").in("id", assigneeIds)
     : { data: [], error: null };
   if (profilesError) throw new Error(`Impossible de charger les responsables : ${profilesError.message}`);
   const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name || "Membre de l’organisation"]));
 
-  const sources: ComplianceActionSource[] = (rows ?? []).map((row) => ({
+  const requirementSources: ComplianceActionSource[] = requirementRows.map((row) => ({
     id: row.id,
     productId: row.product_id,
     productName: row.products.name,
@@ -56,7 +73,33 @@ export async function getWorkspaceActions(workspace: WorkspaceContext) {
     assigneeId: row.assigned_to ?? undefined,
     owner: row.assigned_to ? names.get(row.assigned_to) : undefined,
     dueDateValue: row.due_date ?? undefined,
+    requirementId: row.id,
   }));
 
-  return buildComplianceActions(sources);
+  const regulatorySources: ComplianceActionSource[] = regulatoryRows.map((row: {
+    id: string;
+    title: string;
+    regulation_code: string;
+    severity: RequirementSeverity;
+    status: string;
+    assignee_id: string | null;
+    due_date: string | null;
+    product_id: string;
+    products: { id: string; name: string; sku: string | null; status: string };
+  }) => ({
+    id: row.id,
+    productId: row.product_id,
+    productName: row.products.name,
+    productSku: row.products.sku || "Sans référence",
+    title: row.title,
+    regulation: row.regulation_code,
+    status: row.status === "done" ? "verified" : row.status === "dismissed" ? "not-applicable" : "pending",
+    severity: row.severity,
+    assigneeId: row.assignee_id ?? undefined,
+    owner: row.assignee_id ? names.get(row.assignee_id) : undefined,
+    dueDateValue: row.due_date ?? undefined,
+    actionHref: `/products/${encodeURIComponent(row.product_id)}/regulatory`,
+  }));
+
+  return buildComplianceActions([...requirementSources, ...regulatorySources]);
 }
