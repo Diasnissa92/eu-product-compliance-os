@@ -1,9 +1,12 @@
 import Papa from "papaparse";
 
+export type ProductImportSector = "construction" | "consumer";
+
 export type ProductImportRow = {
   name: string;
   sku: string;
   category: string;
+  sector: ProductImportSector;
   manufacturer: string;
   originCountry: string;
   targetMarkets: string[];
@@ -24,6 +27,8 @@ const aliases: Record<string, keyof ProductImportRow> = {
   category: "category",
   categorie: "category",
   catégorie: "category",
+  sector: "sector",
+  secteur: "sector",
   manufacturer: "manufacturer",
   fabricant: "manufacturer",
   origincountry: "originCountry",
@@ -38,6 +43,13 @@ function normalizeHeader(value: string) {
   return value.trim().toLocaleLowerCase("fr").replace(/[\s_'’-]/g, "");
 }
 
+function normalizeSector(value: string): ProductImportSector | undefined {
+  const normalized = normalizeHeader(value);
+  if (["construction", "produitdeconstruction"].includes(normalized)) return "construction";
+  if (["consumer", "consommation", "produitdeconsommation", "produitconsommation"].includes(normalized)) return "consumer";
+  return undefined;
+}
+
 export function parseProductCsv(source: string): ProductImportPreview {
   const normalized = source.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
   if (!normalized) return { rows: [], errors: [{ row: 1, message: "Le fichier est vide." }] };
@@ -47,25 +59,41 @@ export function parseProductCsv(source: string): ProductImportPreview {
   if (!rawRows.length) return { rows: [], errors: [{ row: 1, message: "Le fichier est vide." }] };
   const rawHeaders = rawRows[0].map((header) => String(header || ""));
   const headers = rawHeaders.map((header) => aliases[normalizeHeader(header)]);
-  if (!headers.includes("name") || !headers.includes("sku")) {
-    return { rows: [], errors: [{ row: 1, message: "Les colonnes nom/name et SKU/référence sont obligatoires." }] };
+  if (!headers.includes("name") || !headers.includes("sku") || !headers.includes("sector")) {
+    return { rows: [], errors: [{ row: 1, message: "Les colonnes nom/name, SKU/référence et secteur/sector sont obligatoires." }] };
   }
+  const recognizedHeaders = headers.filter((header): header is keyof ProductImportRow => Boolean(header));
+  const duplicatedHeader = recognizedHeaders.find((header, index) => recognizedHeaders.indexOf(header) !== index);
+  if (duplicatedHeader) return { rows: [], errors: [{ row: 1, message: `La colonne ${duplicatedHeader} est déclarée plusieurs fois.` }] };
 
   const seenSkus = new Set<string>();
   const rows = rawRows.slice(1, 101).flatMap((cells, index) => {
-    const row: ProductImportRow = { name: "", sku: "", category: "", manufacturer: "", originCountry: "", targetMarkets: [] };
+    const raw: Record<keyof ProductImportRow, string | string[]> = { name: "", sku: "", category: "", sector: "", manufacturer: "", originCountry: "", targetMarkets: [] };
     headers.forEach((header, cellIndex) => {
       if (!header) return;
       const cell = String(cells[cellIndex] || "").trim();
-      if (header === "targetMarkets") row.targetMarkets = cell.split(/[|,/]/).map((value) => value.trim()).filter(Boolean).slice(0, 30);
-      else row[header] = cell;
+      if (header === "targetMarkets") raw.targetMarkets = cell.split(/[|,/]/).map((value) => value.trim()).filter(Boolean).slice(0, 30);
+      else raw[header] = cell;
     });
+    const sector = normalizeSector(String(raw.sector));
+    const row: ProductImportRow = {
+      name: String(raw.name), sku: String(raw.sku), category: String(raw.category), sector: sector || "consumer",
+      manufacturer: String(raw.manufacturer), originCountry: String(raw.originCountry), targetMarkets: raw.targetMarkets as string[],
+    };
     if (!row.name || !row.sku) {
       errors.push({ row: index + 2, message: "Nom et SKU sont obligatoires." });
       return [];
     }
+    if (!sector) {
+      errors.push({ row: index + 2, message: "Secteur invalide : utilisez uniquement construction ou consumer/consommation." });
+      return [];
+    }
     if ([row.name, row.sku, row.category, row.manufacturer, row.originCountry].some((value) => value.length > 240)) {
       errors.push({ row: index + 2, message: "Une valeur dépasse la limite de 240 caractères." });
+      return [];
+    }
+    if (row.targetMarkets.some((value) => value.length > 120)) {
+      errors.push({ row: index + 2, message: "Un marché cible dépasse la limite de 120 caractères." });
       return [];
     }
     const normalizedSku = row.sku.toLocaleLowerCase("fr");
@@ -81,4 +109,4 @@ export function parseProductCsv(source: string): ProductImportPreview {
   return { rows, errors };
 }
 
-export const productImportTemplate = "nom;sku;catégorie;fabricant;pays_origine;marchés\nLampe Luma Mini;LUM-204-FR;Équipement électrique;Nordhavn Design ApS;Danemark;France|Belgique";
+export const productImportTemplate = "nom;sku;catégorie;secteur;fabricant;pays_origine;marchés\nPanneau isolant;PAN-204-FR;Produit de construction;construction;Nordhavn Materials ApS;Danemark;France|Belgique";
