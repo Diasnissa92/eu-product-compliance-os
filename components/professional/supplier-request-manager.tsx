@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clipboard, ExternalLink, Link2, MailPlus, Send, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clipboard, ExternalLink, Link2, MailPlus, Send, ShieldCheck, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import { copyText } from "@/lib/client-actions";
@@ -17,11 +17,12 @@ const statusCopy: Record<string, string> = {
   expired: "Expirée",
   cancelled: "Annulée",
 };
+const responseStatusCopy: Record<string, string> = { submitted: "À examiner", accepted: "Acceptée", rejected: "Rejetée" };
 
 export function SupplierRequestManager({
   products,
   requests: initialRequests,
-  responses,
+  responses: initialResponses,
   persistence,
 }: {
   products: ProfessionalProduct[];
@@ -31,6 +32,7 @@ export function SupplierRequestManager({
 }) {
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
+  const [responses, setResponses] = useState(initialResponses);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string>();
   const [error, setError] = useState<string>();
@@ -57,6 +59,7 @@ export function SupplierRequestManager({
 
     try {
       if (!productId || !supplierName || !supplierEmail || !subject || requestedItems.length === 0) throw new Error("Complétez le produit, le fournisseur, l’objet et au moins une pièce demandée.");
+      if (supplierName.length > 160 || subject.length > 200 || requestedItems.length > 50 || requestedItems.join(",").length > 12000 || (message?.length || 0) > 6000) throw new Error("La demande dépasse les limites autorisées.");
       let request: SupplierRequestRecord;
       if (persistence) {
         const supabase = createClient();
@@ -88,7 +91,7 @@ export function SupplierRequestManager({
       setRequests((current) => [request, ...current]);
       const shareUrl = `${window.location.origin}/supplier/${request.accessToken}`;
       await copyText(shareUrl);
-      setFeedback("Demande créée : le lien fournisseur sécurisé est copié.");
+      setFeedback("Demande créée : le lien fournisseur privé est copié. La possession du lien autorise la réponse ; les pièces devront être vérifiées avant acceptation.");
       event.currentTarget.reset();
       router.refresh();
     } catch (caught) {
@@ -100,18 +103,35 @@ export function SupplierRequestManager({
 
   async function copyPortalLink(token: string) {
     await copyText(`${window.location.origin}/supplier/${token}`);
-    setFeedback("Lien fournisseur copié. Vous pouvez l’envoyer par e-mail ou messagerie.");
+    setFeedback("Lien fournisseur copié. Transmettez-le uniquement au contact prévu ; il agit comme un lien d’accès privé.");
+  }
+
+  async function reviewResponse(responseId: string, status: "accepted" | "rejected") {
+    setSaving(true); setError(undefined);
+    try {
+      if (persistence) {
+        const { error: updateError } = await createClient().from("supplier_responses").update({ status }).eq("id", responseId).eq("org_id", persistence.organizationId);
+        if (updateError) throw updateError;
+      }
+      setResponses((current) => current.map((response) => response.id === responseId ? { ...response, status } : response));
+      setFeedback(status === "accepted" ? "Pièce acceptée après revue." : "Pièce rejetée après revue.");
+      router.refresh();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "La revue de la pièce a échoué."); }
+    finally { setSaving(false); }
   }
 
   async function completeRequest(requestId: string) {
     setError(undefined);
+    const requestResponses = responsesByRequest.get(requestId) || [];
     try {
+      if (requestResponses.some((response) => response.status === "submitted")) throw new Error("Examinez toutes les pièces reçues avant de clôturer la demande.");
+      if (!requestResponses.some((response) => response.status === "accepted")) throw new Error("Au moins une pièce doit être acceptée avant de clôturer la demande.");
       if (persistence) {
         const { error: updateError } = await createClient().from("supplier_requests").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", requestId).eq("org_id", persistence.organizationId);
         if (updateError) throw updateError;
       }
       setRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: "completed" } : request));
-      setFeedback("Demande clôturée et conservée dans l’historique.");
+      setFeedback("Demande clôturée après revue des pièces et conservée dans l’historique.");
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Mise à jour impossible.");
@@ -122,21 +142,21 @@ export function SupplierRequestManager({
     <div className="professional-stack">
       <section className="professional-summary-grid" aria-label="Résumé fournisseurs">
         <article><span>Demandes ouvertes</span><strong>{openCount}</strong><small>Pièces en attente</small></article>
-        <article><span>Réponses reçues</span><strong>{responses.length}</strong><small>À examiner</small></article>
+        <article><span>Réponses reçues</span><strong>{responses.length}</strong><small>{responses.filter((item) => item.status === "submitted").length} à examiner</small></article>
         <article><span>Produits couverts</span><strong>{new Set(requests.map((item) => item.productId)).size}</strong><small>Portefeuille sollicité</small></article>
       </section>
 
       <section className="panel professional-form-panel">
-        <div className="professional-panel-heading"><span className="feature-icon feature-icon-rose"><MailPlus size={20} /></span><div><span className="eyebrow">Collecte externe</span><h2>Demander une preuve à un fournisseur</h2><p>Créez un lien individuel : le fournisseur ne voit ni votre portefeuille ni vos données internes.</p></div></div>
+        <div className="professional-panel-heading"><span className="feature-icon feature-icon-rose"><MailPlus size={20} /></span><div><span className="eyebrow">Collecte externe</span><h2>Demander une preuve à un fournisseur</h2><p>Créez un lien individuel : le fournisseur ne voit ni votre portefeuille ni vos données internes. Le lien est un jeton d’accès privé, pas une preuve d’identité du fournisseur.</p></div></div>
         <form className="professional-form form-grid" onSubmit={createRequest}>
           <label className="field"><span>Produit</span><select name="productId" required defaultValue=""><option value="">Sélectionner</option>{products.map((product) => <option value={product.id} key={product.id}>{product.name} · {product.sku}</option>)}</select></label>
-          <label className="field"><span>Nom du fournisseur</span><input name="supplierName" required placeholder="Ex. Laboratoire ACME" /></label>
-          <label className="field"><span>E-mail du contact</span><input name="supplierEmail" type="email" required placeholder="qualite@fournisseur.eu" /></label>
+          <label className="field"><span>Nom du fournisseur</span><input name="supplierName" required minLength={2} maxLength={160} placeholder="Ex. Laboratoire ACME" /></label>
+          <label className="field"><span>E-mail du contact</span><input name="supplierEmail" type="email" required maxLength={320} placeholder="qualite@fournisseur.eu" /></label>
           <label className="field"><span>Date attendue</span><input name="dueDate" type="date" min={new Date().toISOString().slice(0, 10)} /></label>
-          <label className="field field-full"><span>Objet de la demande</span><input name="subject" required placeholder="Documents de conformité requis" /></label>
-          <label className="field field-full"><span>Pièces demandées <em>une par ligne ou séparées par des virgules</em></span><textarea name="requestedItems" rows={3} required placeholder="Déclaration UE de conformité&#10;Rapport d’essais&#10;Notice en français" /></label>
-          <label className="field field-full"><span>Message <em>optionnel</em></span><textarea name="message" rows={3} placeholder="Précisez le modèle, le lot ou le contexte de la demande." /></label>
-          <div className="professional-form-actions field-full"><span className="secure-note"><ShieldCheck size={16} />Lien opaque et réponse traçable</span><button className="button button-primary" disabled={saving || products.length === 0}><Send size={17} />{saving ? "Création…" : "Créer et copier le lien"}</button></div>
+          <label className="field field-full"><span>Objet de la demande</span><input name="subject" required minLength={3} maxLength={200} placeholder="Documents de conformité requis" /></label>
+          <label className="field field-full"><span>Pièces demandées <em>une par ligne ou séparées par des virgules</em></span><textarea name="requestedItems" rows={3} required maxLength={12000} placeholder="Déclaration UE de conformité&#10;Rapport d’essais&#10;Notice en français" /></label>
+          <label className="field field-full"><span>Message <em>optionnel</em></span><textarea name="message" rows={3} maxLength={6000} placeholder="Précisez le modèle, le lot ou le contexte de la demande." /></label>
+          <div className="professional-form-actions field-full"><span className="secure-note"><ShieldCheck size={16} />Lien opaque · pièces soumises à revue</span><button className="button button-primary" disabled={saving || products.length === 0}><Send size={17} />{saving ? "Création…" : "Créer et copier le lien"}</button></div>
           {feedback ? <p className="form-feedback form-feedback-success field-full" role="status">{feedback}</p> : null}
           {error ? <p className="form-feedback form-feedback-error field-full" role="alert">{error}</p> : null}
         </form>
@@ -147,12 +167,13 @@ export function SupplierRequestManager({
         {requests.length ? <div className="professional-list">{requests.map((request) => {
           const product = products.find((item) => item.id === request.productId);
           const requestResponses = responsesByRequest.get(request.id) || [];
+          const canClose = requestResponses.some((response) => response.status === "accepted") && requestResponses.every((response) => response.status !== "submitted");
           return <article className="professional-row" key={request.id}>
             <span className={`professional-status status-${request.status}`}>{statusCopy[request.status] || request.status}</span>
-            <div className="professional-row-copy"><strong>{request.subject}</strong><p>{request.supplierName} · {request.supplierEmail}</p><small>{product?.name || "Produit"}{request.dueDate ? ` · attendu le ${new Intl.DateTimeFormat("fr-FR").format(new Date(request.dueDate))}` : ""}{requestResponses.length ? ` · ${requestResponses.length} document${requestResponses.length > 1 ? "s" : ""}` : ""}</small>{requestResponses.map((response) => <a className="inline-link" href={response.documentUrl} target="_blank" rel="noreferrer" key={response.id}><ExternalLink size={14} />{response.documentName}</a>)}</div>
-            <div className="professional-row-actions"><button className="button button-secondary button-small" type="button" onClick={() => copyPortalLink(request.accessToken)}><Clipboard size={15} />Copier le lien</button>{requestResponses.length > 0 && request.status !== "completed" ? <button className="button button-primary button-small" type="button" onClick={() => completeRequest(request.id)}><CheckCircle2 size={15} />Clôturer</button> : null}</div>
+            <div className="professional-row-copy"><strong>{request.subject}</strong><p>{request.supplierName} · {request.supplierEmail}</p><small>{product?.name || "Produit"}{request.dueDate ? ` · attendu le ${new Intl.DateTimeFormat("fr-FR").format(new Date(request.dueDate))}` : ""}{requestResponses.length ? ` · ${requestResponses.length} document${requestResponses.length > 1 ? "s" : ""}` : ""}</small>{requestResponses.map((response) => <div key={response.id}><a className="inline-link" href={response.documentUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} />{response.documentName}</a><small> · {responseStatusCopy[response.status] || response.status}</small>{response.status === "submitted" ? <span className="professional-row-actions"><button className="button button-secondary button-small" type="button" disabled={saving} onClick={() => reviewResponse(response.id, "accepted")}><CheckCircle2 size={14} />Accepter</button><button className="button button-secondary button-small" type="button" disabled={saving} onClick={() => reviewResponse(response.id, "rejected")}><XCircle size={14} />Rejeter</button></span> : null}</div>)}</div>
+            <div className="professional-row-actions"><button className="button button-secondary button-small" type="button" onClick={() => copyPortalLink(request.accessToken)}><Clipboard size={15} />Copier le lien</button>{requestResponses.length > 0 && request.status !== "completed" ? <button className="button button-primary button-small" type="button" disabled={!canClose || saving} onClick={() => completeRequest(request.id)}><CheckCircle2 size={15} />Clôturer</button> : null}</div>
           </article>;
-        })}</div> : <div className="empty-state"><Link2 size={29} /><strong>Aucune demande</strong><p>Créez votre premier lien de collecte documentaire sécurisé.</p></div>}
+        })}</div> : <div className="empty-state"><Link2 size={29} /><strong>Aucune demande</strong><p>Créez votre premier lien de collecte documentaire privé et traçable.</p></div>}
       </section>
     </div>
   );
