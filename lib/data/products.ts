@@ -43,7 +43,7 @@ function baseProduct(row: ProductRow): Product {
     status: mapComplianceStatus(row),
     score: row.compliance_score,
     updatedAt: formatDate(row.updated_at),
-    frameworks: row.sector === "construction" ? ["CPR", "DPP"] : ["GPSR"],
+    frameworks: [],
     requirements: [],
     documents: [],
     audit: [],
