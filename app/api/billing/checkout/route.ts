@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { stripePost } from "@/lib/stripe-rest";
 
 type CheckoutSession = { url?: string | null };
+type SubscriptionCustomer = { stripe_customer_id: string | null };
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +18,9 @@ export async function POST(request: NextRequest) {
     const plan = assertPaidPlanCode(body.plan);
     const priceId = readiness.config.prices[plan];
     const supabase = await createClient();
-    // @ts-expect-error Phase 2 table exists in production; generated types are refreshed after merge.
-    const { data: subscription } = await supabase.from("organization_subscriptions").select("stripe_customer_id").eq("org_id", workspace.organizationId).maybeSingle();
+    // @ts-expect-error Phase 2 table exists in production; generated types are refreshed separately.
+    const { data: rawSubscription } = await supabase.from("organization_subscriptions").select("stripe_customer_id").eq("org_id", workspace.organizationId).maybeSingle();
+    const subscription = rawSubscription as SubscriptionCustomer | null;
     const origin = new URL(request.url).origin;
     const session = await stripePost<CheckoutSession>(readiness.config.secretKey, "checkout/sessions", {
       mode: "subscription",
